@@ -28,18 +28,18 @@ pieceToFen = {
     }
 
 fenToImage = {
-    "k" : Image.open("bking.png").resize((100,100), Image.ANTIALIAS),
-    "q" : Image.open("bqueen.png").resize((100,100), Image.ANTIALIAS),
-    "b" : Image.open("bbishop.png").resize((100,100), Image.ANTIALIAS),
-    "n" : Image.open("bhorse.png").resize((100,100), Image.ANTIALIAS),
-    "r" : Image.open("brook.png").resize((100,100), Image.ANTIALIAS),
-    "p" : Image.open("bpawn.png").resize((100,100), Image.ANTIALIAS),
-    "K" : Image.open("wking.png").resize((100,100), Image.ANTIALIAS),
-    "Q" : Image.open("wqueen.png").resize((100,100), Image.ANTIALIAS),
-    "B" : Image.open("wbishop.png").resize((100,100), Image.ANTIALIAS),
-    "N" : Image.open("whorse.png").resize((100,100), Image.ANTIALIAS),
-    "R" : Image.open("wrook.png").resize((100,100), Image.ANTIALIAS),
-    "P" : Image.open("wpawn.png").resize((100,100), Image.ANTIALIAS),
+    "k" : Image.open("src/bking.png").resize((100,100), Image.ANTIALIAS),
+    "q" : Image.open("src/bqueen.png").resize((100,100), Image.ANTIALIAS),
+    "b" : Image.open("src/bbishop.png").resize((100,100), Image.ANTIALIAS),
+    "n" : Image.open("src/bhorse.png").resize((100,100), Image.ANTIALIAS),
+    "r" : Image.open("src/brook.png").resize((100,100), Image.ANTIALIAS),
+    "p" : Image.open("src/bpawn.png").resize((100,100), Image.ANTIALIAS),
+    "K" : Image.open("src/wking.png").resize((100,100), Image.ANTIALIAS),
+    "Q" : Image.open("src/wqueen.png").resize((100,100), Image.ANTIALIAS),
+    "B" : Image.open("src/wbishop.png").resize((100,100), Image.ANTIALIAS),
+    "N" : Image.open("src/whorse.png").resize((100,100), Image.ANTIALIAS),
+    "R" : Image.open("src/wrook.png").resize((100,100), Image.ANTIALIAS),
+    "P" : Image.open("src/wpawn.png").resize((100,100), Image.ANTIALIAS),
 }
 
 fenToPiece = {
