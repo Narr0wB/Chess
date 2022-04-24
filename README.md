@@ -1,4 +1,21 @@
-# Overview
-This is a chess engine and soon to be a chess ai program written in python.
-The board's rendering is based off the Tkinter module, and the rules are hard coded into the GameBoard object.
-I also added FEN support, in order to load a specific board, though i still have to work on the overall efficiency of the code, along with the code's cleanliness.
+# Narrow's chess engine
+This is a chess engine and soon to be a chess AI program written in python.
+
+## Installation
+In order to be able to use this engine, you will need the tkinter module that can be easily obtained through the python package manager.
+
+```bash
+pip install tkinter
+```
+## Usage
+
+```python
+import tkinter as tk
+
+root = tk.Tk()
+board = GameBoard(root) # or GameBoard(root, start="fen string") to initialize a specific board
+board.mainloop()
+```
+
+## Licence
+[MIT](https://en.wikipedia.org/wiki/MIT_License)
