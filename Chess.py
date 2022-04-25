@@ -2,6 +2,14 @@ import tkinter as tk
 import time
 from PIL import Image, ImageTk
 
+"""
+    TODO list:
+        - Add images of the eaten piece under or over the board
+        - Add a moves log
+        - Start working on the AI
+        
+"""
+
 KING = 0
 QUEEN = 1
 BISHOP = 2
@@ -74,21 +82,22 @@ def sleep(ms: float):
     
 
 class GameBoard(tk.Frame):
-    def __init__(self, parent, rows=8, columns=8, color1="#EEEED2", color2="#769656", start: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"):
+    def __init__(self, parent, rows=8, columns=8, color1="#EEEED2", color2="#769656", start: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR KQkq w"):
 
-
+        self.parent = parent
         self.rows = rows
         self.columns = columns
-        self.size = 93
+        self.fullscreen = True
+        self.size = 95
         self.boardColor1 = color1
         self.boardColor2 = color2
         self.animationFps = 144
         self.currentPlayer = WHITE
         self.selectedPiece = ()
-        self.whiteKingsideCastle = True
-        self.whiteQueensideCastle = True
-        self.blackKingsideCastle = True
-        self.blackQueensideCastle = True
+        self.whiteKingsideCastle = False
+        self.whiteQueensideCastle = False
+        self.blackKingsideCastle = False
+        self.blackQueensideCastle = False
         self.moves = []
 
         self.board = {}
@@ -96,19 +105,28 @@ class GameBoard(tk.Frame):
         canvas_width = columns * self.size
         canvas_height = rows * self.size
 
+        self.parent.geometry(f"{(self.size+30)*8}x{(self.size+30)*8}")
+        self.parent.resizable(False, False)
+        self.parent.attributes("-fullscreen", self.fullscreen)
         tk.Frame.__init__(self, parent)
         tk.Frame.pack(self, side="top", fill="both", expand="true", padx=4, pady=4)
+        tk.Frame.config(self, bg="#232b2b")
         self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0,
-                                width=canvas_width, height=canvas_height, background="bisque")
-        self.canvas.pack(side="top", fill="both", expand=True, padx=2, pady=2)
+                                width=canvas_width+1, height=canvas_height+1, background="#ffffff")
+        self.canvas.pack(side="top", fill="none", expand=True, padx=100, pady=100)
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
+        self.parent.bind("<F11>", self.toggle_fullscreen)
         self.drawBoard()
+        self.after(16, self.refresh)
         self.fromFen(start)
+    
+    def toggle_fullscreen(self, event):
+        self.fullscreen = not self.fullscreen
+        self.parent.attributes("-fullscreen", self.fullscreen)
 
     def refresh(self):
-        #self.drawFrame()
         self.after(16, self.refresh)
 
     def drawBoard(self):
@@ -130,16 +148,25 @@ class GameBoard(tk.Frame):
         self.board = {}
         row = 0
         col = 0
-        for char in fen:
-            if char == "/":
+        spacePos = fen.find(" ")
+        for i in range(len(fen)):
+            if fen[i] == "/":
                 row += 1
                 col = 0
-            elif char.isdigit():
-                col += int(char)
-            if char in fenToPiece:
-                self.addpiece(createPiece(char), row, col)
+            elif fen[i].isdigit():
+                col += int(fen[i])
+            if fen[i] in fenToPiece and i < spacePos:
+                self.addpiece(createPiece(fen[i]), row, col)
                 col += 1
-            self.currentPlayer = BLACK if char == "b" else WHITE
+            self.currentPlayer = BLACK if fen[i] == "b" else WHITE
+            if fen[i] == "K" and i > spacePos:
+                self.whiteKingsideCastle = True
+            if fen[i] == "Q" and i > spacePos:
+                self.whiteQueensideCastle = True
+            if fen[i] == "k" and i > spacePos:
+                self.blackKingsideCastle = True
+            if fen[i] == "q" and i > spacePos:
+                self.blackQueensideCastle = True
         for key in self.board:
             self.drawpiece(self.board[key], key[0], key[1])
         self.canvas.tag_raise("piece")
@@ -158,7 +185,16 @@ class GameBoard(tk.Frame):
                     spaces += 1
             fenStr += f"{spaces if spaces > 0 else ''}/"
             spaces = 0
-        fenStr += f" {self.currentPlayer}"
+        fenStr += " "
+        if self.whiteKingsideCastle:
+            fenStr += "K"
+        if self.whiteQueensideCastle:
+            fenStr += "Q"
+        if self.whiteKingsideCastle:
+            fenStr += "k"
+        if self.blackQueensideCastle:
+            fenStr += "q"
+        fenStr += " b" if self.currentPlayer else " w"
         return fenStr
 
     # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
@@ -196,8 +232,10 @@ class GameBoard(tk.Frame):
         elif self.board[(oldRow, oldColumn)].uniqueCode == "1R":
             self.whiteKingsideCastle = False
         
+        # TODO 1: add images of the eaten piece under or over the board
         if (newRow, newColumn) in self.board:
             self.board.pop((newRow, newColumn))
+            
         tempSquare = self.board[(oldRow, oldColumn)]
         self.board.pop((oldRow, oldColumn))
         self.board[(newRow, newColumn)] = tempSquare
@@ -206,15 +244,18 @@ class GameBoard(tk.Frame):
         x1 = (newColumn * self.size) + int(self.size/2)
         y1 = (newRow * self.size) + int(self.size/2)
         for i in range(self.animationFps+1):
-            sleep(0.0000155/self.animationFps)
+            sleep(0.00155/self.animationFps)
             self.canvas.coords(self.board[(newRow, newColumn)].uniqueCode, x0+((x1-x0)/self.animationFps)*i, y0+((y1-y0)/self.animationFps)*i)
             self.canvas.update()
 
 
     # Returns the clicked-on tile's coordinates 
     def getMouseClickPos(self, event) -> tuple:
-        item_below = self.canvas.find_overlapping(event.x,event.y,event.x,event.y)[0]
-        return ((item_below - 1) // 8, (item_below - 1 ) % 8)
+        try:
+            item_below = self.canvas.find_overlapping(event.x,event.y,event.x,event.y)[0]
+            return ((item_below - 1) // 8, (item_below - 1 ) % 8)
+        except:
+            return(8,8)
 
     def onReleaseMove(self, startCoords: tuple, dropCoords: tuple):
         x1 = (dropCoords[1] * self.size) + int(self.size/2)
@@ -233,45 +274,54 @@ class GameBoard(tk.Frame):
                 self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1)
 
     def onRelease(self, event):
-        dropCoords = self.getMouseClickPos(event)
-        if dropCoords in self.moves and self.selectedPiece in self.board:
-            if self.board[self.selectedPiece].uniqueCode == "0r":
-                self.blackQueensideCastle = False
-            elif self.board[self.selectedPiece].uniqueCode == "1r":
-                self.blackKingsideCastle = False
-            elif self.board[self.selectedPiece].uniqueCode == "0R":
-                self.whiteQueensideCastle = False
-            elif self.board[self.selectedPiece].uniqueCode == "1R":
-                self.whiteKingsideCastle = False
-            if self.board[self.selectedPiece].type == "K":
-                self.whiteKingsideCastle = False
-                self.whiteQueensideCastle = False
-                if dropCoords == (7, 2):
-                    self.placepiece(7, 0, 7, 3)
-                elif dropCoords == (7, 6):
-                    self.placepiece(7, 7, 7, 5)
-            elif self.board[self.selectedPiece].type == "k":
-                self.blackKingsideCastle = False
-                self.blackQueensideCastle = False
-                if dropCoords == (0, 2):
-                    self.placepiece(0, 0, 0, 3)
-                elif dropCoords == (0, 6):
-                    self.placepiece(0, 7, 0, 5)
+        try:
+            dropCoords = self.getMouseClickPos(event)
+            if dropCoords in self.moves and self.selectedPiece in self.board:
+                if self.board[self.selectedPiece].uniqueCode == "0r":
+                    self.blackQueensideCastle = False
+                elif self.board[self.selectedPiece].uniqueCode == "1r":
+                    self.blackKingsideCastle = False
+                elif self.board[self.selectedPiece].uniqueCode == "0R":
+                    self.whiteQueensideCastle = False
+                elif self.board[self.selectedPiece].uniqueCode == "1R":
+                    self.whiteKingsideCastle = False
+                if self.board[self.selectedPiece].type == "K":
+                    self.whiteKingsideCastle = False
+                    self.whiteQueensideCastle = False
+                    if dropCoords == (7, 2):
+                        self.placepiece(7, 0, 7, 3)
+                    elif dropCoords == (7, 6):
+                        self.placepiece(7, 7, 7, 5)
+                elif self.board[self.selectedPiece].type == "k":
+                    self.blackKingsideCastle = False
+                    self.blackQueensideCastle = False
+                    if dropCoords == (0, 2):
+                        self.placepiece(0, 0, 0, 3)
+                    elif dropCoords == (0, 6):
+                        self.placepiece(0, 7, 0, 5)
 
-            self.onReleaseMove(self.selectedPiece, dropCoords)
-            self.moves = []
-            self.selectedPiece = ()
-            self.currentPlayer = int(not self.currentPlayer)
-        elif self.selectedPiece in self.board:
-            x1 = (self.selectedPiece[1] * self.size) + int(self.size/2)
-            y1 = (self.selectedPiece[0] * self.size) + int(self.size/2)
-            self.canvas.coords(self.board[self.selectedPiece].uniqueCode, x1, y1)
+                self.onReleaseMove(self.selectedPiece, dropCoords)
+                self.moves = []
+                self.selectedPiece = ()
+                self.currentPlayer = int(not self.currentPlayer)
+            elif self.selectedPiece in self.board:
+                x1 = (self.selectedPiece[1] * self.size) + int(self.size/2)
+                y1 = (self.selectedPiece[0] * self.size) + int(self.size/2)
+                self.canvas.coords(self.board[self.selectedPiece].uniqueCode, x1, y1)
+        except:
+            pass
 
 
     def onDrag(self, event):
         try:
             if self.selectedPiece:
-                self.canvas.coords(self.board[(self.selectedPiece[0], self.selectedPiece[1])].uniqueCode, event.x, event.y)
+                y = event.y
+                x = event.x
+                if not 30 < event.x < self.canvas.winfo_width()-30:
+                    x = self.canvas.winfo_width()-30 if event.x > self.canvas.winfo_width()-30 else 30
+                if not 30 < event.y < self.canvas.winfo_height()-30:
+                    y = self.canvas.winfo_height()-30 if event.y > self.canvas.winfo_height()-30 else 30
+                self.canvas.coords(self.board[(self.selectedPiece[0], self.selectedPiece[1])].uniqueCode, x, y)
         except:
             pass
 
@@ -329,6 +379,28 @@ class GameBoard(tk.Frame):
                     self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2)
                 else:
                     self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1)
+                if self.board[self.selectedPiece].uniqueCode == "0r":
+                    self.blackQueensideCastle = False
+                elif self.board[self.selectedPiece].uniqueCode == "1r":
+                    self.blackKingsideCastle = False
+                elif self.board[self.selectedPiece].uniqueCode == "0R":
+                    self.whiteQueensideCastle = False
+                elif self.board[self.selectedPiece].uniqueCode == "1R":
+                    self.whiteKingsideCastle = False
+                if self.board[self.selectedPiece].type == "K":
+                    self.whiteKingsideCastle = False
+                    self.whiteQueensideCastle = False
+                    if clickPos == (7, 2):
+                        self.placepiece(7, 0, 7, 3)
+                    elif clickPos == (7, 6):
+                        self.placepiece(7, 7, 7, 5)
+                elif self.board[self.selectedPiece].type == "k":
+                    self.blackKingsideCastle = False
+                    self.blackQueensideCastle = False
+                    if clickPos == (0, 2):
+                        self.placepiece(0, 0, 0, 3)
+                    elif clickPos == (0, 6):
+                        self.placepiece(0, 7, 0, 5)
                 self.placepiece(self.selectedPiece[0], self.selectedPiece[1], clickPos[0], clickPos[1])
                 self.currentPlayer = int(not self.currentPlayer)
                 for move in self.moves:
@@ -339,9 +411,9 @@ class GameBoard(tk.Frame):
                 self.moves = []
                 self.selectedPiece = ()
 
-    def generateAllLegalMoves(self, row, col):
+    def generateAllLegalMoves(self, color: int):
         allMoves = []
-        kingColor = self.board[(row, col)].color
+        kingColor = color
         for key in self.board:
             if self.board[key].color != kingColor and self.board[key].type.lower() != "k" and self.board[key].type.lower() != "p":
                 allMoves += self.generateLegalMovesNoSafety(key[0], key[1])
@@ -792,6 +864,15 @@ class GameBoard(tk.Frame):
 
         pieceColor = self.board[(row, col)].color
 
+
+        allMoves = self.generateAllLegalMoves(pieceColor)
+        for move in [(row+1, col), (row-1, col), (row+1, col+1), (row-1, col-1), (row+1, col-1), (row-1, col+1), (row, col+1), (row, col-1)]:
+            if not move in allMoves:
+                if move in self.board and self.board[move].color != pieceColor:
+                    moves.append(move)
+                elif move not in self.board:
+                    moves.append(move)
+        
         for key in self.board:
             if self.board[key].type == "r" and (row, col) == (0, 4) and self.board[key].color == self.currentPlayer and key in [(row,0), (row,7)]:
                 blocked = False
@@ -804,7 +885,7 @@ class GameBoard(tk.Frame):
                     blocked = True
                 elif key == (row,7) and not self.blackKingsideCastle:
                     blocked = True
-                if not blocked:
+                if not blocked and (row, 4 + offset) in moves:
                     moves.append((row, 4 + 2*offset))
             if self.board[key].type == "R" and (row, col) == (7, 4) and self.board[key].color == self.currentPlayer and key in [(row,0), (row,7)]:
                 blocked = False
@@ -817,28 +898,15 @@ class GameBoard(tk.Frame):
                     blocked = True
                 elif key == (row,7) and not self.whiteKingsideCastle:
                     blocked = True
-                if not blocked:
+                if not blocked and (row, 4 + offset) in moves:
                     moves.append((row, 4 + 2*offset))
-
-        for move in [(row+1, col), (row-1, col), (row+1, col+1), (row-1, col-1), (row+1, col-1), (row-1, col+1), (row, col+1), (row, col-1)]:
-            if not move in self.generateAllLegalMoves(row, col):
-                if move in self.board and self.board[move].color != pieceColor:
-                    moves.append(move)
-                elif move not in self.board:
-                    moves.append(move)
         
         return moves
                 
 
 
-            
-
-
 if __name__ == "__main__":
     root = tk.Tk()
-    root.geometry(f"{95*8}x{95*8}")
-    root.resizable(False, False)
-    board = GameBoard(root, start="r3k2r/8/8/8/8/8/8/R3K2R w")
+    board = GameBoard(root, start="r3k2r/8/8/8/8/8/8/R3K2R KQkq w")
     print(board.currentToFen())
-    board.after(16, board.refresh)
-    root.mainloop()
+    board.mainloop()
