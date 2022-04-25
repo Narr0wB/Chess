@@ -8,7 +8,13 @@ In order to be able to use this engine, you will need the tkinter module that ca
 pip install tkinter
 ```
 
-Once installed the tkinter module, clone the repository in your src folder.
+Once installed the tkinter module, clone the repository in your src folder with the following commands (if you have GIT installed)
+
+```bash
+$ git init
+
+$ git clone https://github.com/Narr0wB/Chess
+```
 
 ## Usage
 
