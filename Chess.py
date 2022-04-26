@@ -5,9 +5,7 @@ from PIL import Image, ImageTk
 """
     TODO list:
         - Add images of the eaten piece under or over the board
-        - Add a moves log
-        - Start working on the AI
-        
+        - Start working on the AI       
 """
 
 KING = 0
@@ -65,6 +63,17 @@ fenToPiece = {
     "P" : (PAWN, WHITE),
     }
 
+columnToLetter = {
+    0 : "a",
+    1 : "b",
+    2 : "c",
+    3 : "d",
+    4 : "e",
+    5 : "f",
+    6 : "g",
+    7 : "h"
+}
+
 class Piece:
     def __init__(self, pieceType: int, color: int):
         self.type = pieceToFen[(pieceType, color)]
@@ -98,9 +107,12 @@ class GameBoard(tk.Frame):
         self.whiteQueensideCastle = False
         self.blackKingsideCastle = False
         self.blackQueensideCastle = False
+        self.enpassant = []
         self.moves = []
 
         self.board = {}
+        self.oldBoard = {}
+        self.moveLog = ""
 
         canvas_width = columns * self.size
         canvas_height = rows * self.size
@@ -117,6 +129,7 @@ class GameBoard(tk.Frame):
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
+        self.parent.bind("<F8>", lambda event: print(self.moveLog, len(self.moveLog)))
         self.parent.bind("<F11>", self.toggle_fullscreen)
         self.drawBoard()
         self.after(16, self.refresh)
@@ -127,6 +140,11 @@ class GameBoard(tk.Frame):
         self.parent.attributes("-fullscreen", self.fullscreen)
 
     def refresh(self):
+        for key in self.oldBoard:
+            for elem in self.board:
+                if self.board[elem].uniqueCode == self.oldBoard[key].uniqueCode and key != elem:
+                    self.moveLog += f"{columnToLetter[key[1]] + str(key[0])}, {columnToLetter[elem[1]] + str(elem[0])}\n"
+        self.oldBoard = self.board.copy()
         self.after(16, self.refresh)
 
     def drawBoard(self):
@@ -169,6 +187,7 @@ class GameBoard(tk.Frame):
                 self.blackQueensideCastle = True
         for key in self.board:
             self.drawpiece(self.board[key], key[0], key[1])
+        self.oldBoard = self.board.copy()
         self.canvas.tag_raise("piece")
         self.canvas.tag_lower("square")
 
@@ -299,7 +318,15 @@ class GameBoard(tk.Frame):
                         self.placepiece(0, 0, 0, 3)
                     elif dropCoords == (0, 6):
                         self.placepiece(0, 7, 0, 5)
-
+                offset = 1 if self.board[self.selectedPiece].color else -1
+                if self.board[self.selectedPiece].uniqueCode in self.enpassant:
+                    self.enpassant.remove(self.board[self.selectedPiece].uniqueCode)
+                if self.board[self.selectedPiece].type.lower() == "p" and dropCoords[0] == self.selectedPiece[0]+2*offset:
+                    self.enpassant.append(self.board[self.selectedPiece].uniqueCode)
+                for i in [1, -1]:
+                    if self.board[self.selectedPiece].type.lower() == "p" and dropCoords == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i):
+                        self.canvas.delete(self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode)
+                        self.board.pop((self.selectedPiece[0], self.selectedPiece[1]+i))
                 self.onReleaseMove(self.selectedPiece, dropCoords)
                 self.moves = []
                 self.selectedPiece = ()
@@ -401,6 +428,15 @@ class GameBoard(tk.Frame):
                         self.placepiece(0, 0, 0, 3)
                     elif clickPos == (0, 6):
                         self.placepiece(0, 7, 0, 5)
+                offset = 1 if self.board[self.selectedPiece].color else -1
+                if self.board[self.selectedPiece].uniqueCode in self.enpassant:
+                    self.enpassant.remove(self.board[self.selectedPiece].uniqueCode)
+                if self.board[self.selectedPiece].type.lower() == "p" and clickPos[0] == self.selectedPiece[0]+2*offset:
+                    self.enpassant.append(self.board[self.selectedPiece].uniqueCode)
+                for i in [1, -1]:
+                    if self.board[self.selectedPiece].type.lower() == "p" and clickPos == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i):
+                        self.canvas.delete(self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode)
+                        self.board.pop((self.selectedPiece[0], self.selectedPiece[1]+i))
                 self.placepiece(self.selectedPiece[0], self.selectedPiece[1], clickPos[0], clickPos[1])
                 self.currentPlayer = int(not self.currentPlayer)
                 for move in self.moves:
@@ -697,7 +733,6 @@ class GameBoard(tk.Frame):
 
         pieceColor = self.board[(row, col)].color
 
-
         offset = -1 if pieceColor == WHITE else 1
         if (row+offset, col) in self.board:
             return moves
@@ -706,8 +741,11 @@ class GameBoard(tk.Frame):
         if (row == 6 or row == 1) and not (row+2*offset, col) in self.board:
                 moves.append((row+2*offset, col))
         for i in [1, -1]:
+            if (row, col+i) in self.board and self.board[(row, col+i)].type.lower() == "p" and self.board[(row, col+i)].color != pieceColor and self.board[(row, col+i)].uniqueCode in self.enpassant:
+                moves.append((row+offset, col+i))
             if (row+offset, col+i) in self.board and self.board[(row+offset, col+i)].color != pieceColor:
                 moves.append((row+offset, col+i))
+            
 
         return moves
 
@@ -907,6 +945,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root, start="r3k2r/8/8/8/8/8/8/R3K2R KQkq w")
+    board = GameBoard(root) #start="r3k2r/8/8/8/8/8/8/R3K2R KQkq w")
     print(board.currentToFen())
     board.mainloop()
