@@ -1,6 +1,11 @@
 import tkinter as tk
 import time
+import platform
 from PIL import Image, ImageTk
+
+my_system = platform.uname()
+
+TIMEFL = 0.00000000150 if my_system.node.lower().find("desktop") == -1 else 0.00150
 
 """
     TODO list:
@@ -122,10 +127,10 @@ class GameBoard(tk.Frame):
         self.parent.attributes("-fullscreen", self.fullscreen)
         tk.Frame.__init__(self, parent)
         tk.Frame.pack(self, side="top", fill="both", expand="true", padx=4, pady=4)
-        tk.Frame.config(self, bg="#232b2b")
+        tk.Frame.config(self, bg="#aaff80")
         self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0,
                                 width=canvas_width+1, height=canvas_height+1, background="#ffffff")
-        self.canvas.pack(side="top", fill="none", expand=True, padx=100, pady=100)
+        self.canvas.pack(side="top", fill="none", expand=True, padx=1, pady=1)
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
@@ -263,7 +268,7 @@ class GameBoard(tk.Frame):
         x1 = (newColumn * self.size) + int(self.size/2)
         y1 = (newRow * self.size) + int(self.size/2)
         for i in range(self.animationFps+1):
-            sleep(0.00155/self.animationFps)
+            sleep(TIMEFL/self.animationFps)
             self.canvas.coords(self.board[(newRow, newColumn)].uniqueCode, x0+((x1-x0)/self.animationFps)*i, y0+((y1-y0)/self.animationFps)*i)
             self.canvas.update()
 
@@ -945,6 +950,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root) #start="r3k2r/8/8/8/8/8/8/R3K2R KQkq w")
+    board = GameBoard(root)
     print(board.currentToFen())
     board.mainloop()
