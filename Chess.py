@@ -242,8 +242,6 @@ class GameBoard(tk.Frame):
     def placepiece(self, oldRow: int, oldColumn: int, newRow: int, newColumn: int):
 
         # TODO 1: add images of the eaten piece under or over the board
-        if (newRow, newColumn) in self.board:
-            self.board.pop((newRow, newColumn))
             
         tempSquare = self.board[(oldRow, oldColumn)]
         self.board.pop((oldRow, oldColumn))
@@ -452,25 +450,25 @@ class GameBoard(tk.Frame):
         return allMoves
      
 
-    def checkForKingSafety(self):
+    def checkForKingSafety(self, board):
         piecesMoves = {}
         kingPos = ()
 
-        for key in self.board:
-            if self.board[key].type.lower() == "k" and self.board[key].color == self.currentPlayer:
+        for key in board:
+            if board[key].type.lower() == "k" and board[key].color == self.currentPlayer:
                 kingPos = key
 
-        for key in self.board:
-            if (self.board[key].color != self.currentPlayer) and (self.board[key].type.lower() == "p" or self.board[key].type.lower() == "n" or self.board[key].type.lower() == "k"):
+        for key in board:
+            if (board[key].color != self.currentPlayer) and (board[key].type.lower() == "p" or board[key].type.lower() == "n" or board[key].type.lower() == "k"):
                 dangerousMoves = self.generateLegalMovesNoSafety(key[0], key[1])
                 if kingPos in dangerousMoves:
                     piecesMoves[kingPos] = self.kingMoves(kingPos[0], kingPos[1])
-            elif (self.board[key].color != self.currentPlayer) and (self.board[key].type.lower() == "r" or self.board[key].type.lower() == "b" or self.board[key].type.lower() == "q"):
-                kingBeam = self.findBeam(key[0], key[1], kingPos[0], kingPos[1], fenToPiece[self.board[key].type.lower()][0])
+            elif (board[key].color != self.currentPlayer) and (board[key].type.lower() == "r" or board[key].type.lower() == "b" or board[key].type.lower() == "q"):
+                kingBeam = self.findBeam(board, key[0], key[1], kingPos[0], kingPos[1], fenToPiece[board[key].type.lower()][0])
                 if kingBeam:
                     piecesMoves[kingPos] = self.kingMoves(kingPos[0], kingPos[1])
-                    for key2 in self.board:
-                        if self.board[key2].color == self.currentPlayer:
+                    for key2 in board:
+                        if board[key2].color == self.currentPlayer:
                             savingMoves = []
                             for move in self.generateLegalMovesNoSafety(key2[0], key2[1]):
                                 if move in kingBeam or move == key:
@@ -478,7 +476,6 @@ class GameBoard(tk.Frame):
                             if savingMoves:
                                 piecesMoves[key2] = savingMoves
 
-        
         return piecesMoves
                 
     def generateLegalMovesNoSafety(self, row: int, col: int) -> list:
@@ -510,7 +507,7 @@ class GameBoard(tk.Frame):
 
     def generateLegalMoves(self, row: int, col: int) -> list:
         moves = []
-        obligatoryMoves = self.checkForKingSafety()
+        obligatoryMoves = self.checkForKingSafety(self.board)
 
         if not (row, col) in self.board:
             return moves
@@ -525,193 +522,204 @@ class GameBoard(tk.Frame):
 
 
         if pieceType == "p":
-            return self.pawnMoves(row, col)
+            moves = self.pawnMoves(row, col)
 
         if pieceType == "n":
-            return self.knightMoves(row, col)
+            moves = self.knightMoves(row, col)
 
         if pieceType == "r":
-            return self.rookMoves(row, col)
+            moves = self.rookMoves(row, col)
 
         if pieceType == "b":
-            return self.bishopMoves(row, col)
+            moves = self.bishopMoves(row, col)
 
         if pieceType == "q":
-            return self.queenMoves(row, col)
+            moves = self.queenMoves(row, col)
         
         if pieceType == "k":
-            return self.kingMoves(row, col)
+            moves = self.kingMoves(row, col)
+        
+        finalMoves = []
+        for move in moves:
+            currentBoard = self.board.copy()
+            tempPiece = currentBoard[(row, col)]
+            currentBoard[move] = tempPiece
+            currentBoard.pop((row, col))
+            if not self.checkForKingSafety(currentBoard):
+                finalMoves.append(move)
+        
+        return finalMoves
     
     # FINDBEAM 
-    def findBeam(self, row: int, col: int, kingRow: int, kingCol: int, pieceType: int) -> list:
+    def findBeam(self, board: dict, row: int, col: int, kingRow: int, kingCol: int, pieceType: int) -> list:
         """
 
         Find the beam that is pointing to the king, so that you can find a piece whose legal moves contain atleast one move in the beam
 
         """
-        pieceColor = self.board[(row, col)].color
+        pieceColor = board[(row, col)].color
         beam = []
 
         if pieceType == ROOK:
             for i in range(1, 8-row):
-                if (row+i, col) in self.board and self.board[(row+i, col)].color != pieceColor:
+                if (row+i, col) in board and board[(row+i, col)].color != pieceColor:
                     beam.append((row+i, col))
                     if (kingRow, kingCol) == (row+i, col):
                         return beam
                     break
-                elif (row+i, col) in self.board:
+                elif (row+i, col) in board:
                     break
                 beam.append((row+i, col))
             beam.clear()
             for i in range(row-1, -1, -1):
-                if (i, col) in self.board and self.board[(i, col)].color != pieceColor:
+                if (i, col) in board and board[(i, col)].color != pieceColor:
                     beam.append((i, col))
                     if (kingRow, kingCol) == (i, col):
                         return beam
                     break
-                elif (i, col) in self.board:
+                elif (i, col) in board:
                     break
                 beam.append((i, col))
             beam.clear()
             for i in range(1, 8-col):
-                if (row, col+i) in self.board and self.board[(row, col+i)].color != pieceColor:
+                if (row, col+i) in board and board[(row, col+i)].color != pieceColor:
                     beam.append((row, col+i))
                     if (kingRow, kingCol) == (row, col+i):
                         return beam
                     break
-                elif (row, col+i) in self.board:
+                elif (row, col+i) in board:
                     break
                 beam.append((row, col+i))
             beam.clear()
             for i in range(col-1, -1, -1):
-                if (row, i) in self.board and self.board[(row, i)].color != pieceColor:
+                if (row, i) in board and board[(row, i)].color != pieceColor:
                     beam.append((row, i))  
                     if (kingRow, kingCol) == (row, i):
                         return beam
                     break
-                elif (row, i) in self.board:
+                elif (row, i) in board:
                     break
                 beam.append((row, i))
             beam.clear()
         elif pieceType == BISHOP:
             for i in range(1, min(8-row, 8-col)):
-                if (row+i, col+i) in self.board and self.board[(row+i, col+i)].color != pieceColor:
+                if (row+i, col+i) in board and board[(row+i, col+i)].color != pieceColor:
                     beam.append((row+i, col+i))
                     if (kingRow, kingCol) == (row+i, col+i):
                         return beam
                     break
-                elif (row+i, col+i) in self.board:
+                elif (row+i, col+i) in board:
                     break
                 beam.append((row+i, col+i))
             beam.clear()
             for i in range(1, min(row, col)+1):
-                if (row-i, col-i) in self.board and self.board[(row-i, col-i)].color != pieceColor:
+                if (row-i, col-i) in board and board[(row-i, col-i)].color != pieceColor:
                     beam.append((row-i, col-i))
                     if (kingRow, kingCol) == (row-i, col-i):
                         return beam
                     break
-                elif (row-i, col-i) in self.board:
+                elif (row-i, col-i) in board:
                     break
                 beam.append((row-i, col-i))
             beam.clear()
             for i in range(1, min(row+1, 8-col)):
-                if (row-i, col+i) in self.board and self.board[(row-i, col+i)].color != pieceColor:
+                if (row-i, col+i) in board and board[(row-i, col+i)].color != pieceColor:
                     beam.append((row-i, col+i))
                     if (kingRow, kingCol) == (row-i, col+i):
                         return beam
                     break
-                elif (row-i, col+i) in self.board:
+                elif (row-i, col+i) in board:
                     break
                 beam.append((row-i, col+i))
             beam.clear()
             for i in range(1, min(8-row, col+1)):
-                if (row+i, col-i) in self.board and self.board[(row+i, col-i)].color != pieceColor:
+                if (row+i, col-i) in board and board[(row+i, col-i)].color != pieceColor:
                     beam.append((row+i, col-i))
                     if (kingRow, kingCol) == (row+i, col-i):
                         return beam
                     break
-                elif (row+i, col-i) in self.board:
+                elif (row+i, col-i) in board:
                     break
                 beam.append((row+i, col-i))
             beam.clear()
         elif pieceType == QUEEN:
             for i in range(1, 8-row):
-                if (row+i, col) in self.board and self.board[(row+i, col)].color != pieceColor:
+                if (row+i, col) in board and board[(row+i, col)].color != pieceColor:
                     beam.append((row+i, col))
                     if (kingRow, kingCol) == (row+i, col):
                         return beam
                     break
-                elif (row+i, col) in self.board:
+                elif (row+i, col) in board:
                     break
                 beam.append((row+i, col))
             beam.clear()
             for i in range(row-1, -1, -1):
-                if (i, col) in self.board and self.board[(i, col)].color != pieceColor:
+                if (i, col) in board and board[(i, col)].color != pieceColor:
                     beam.append((i, col))
                     if (kingRow, kingCol) == (i, col):
                         return beam
                     break
-                elif (i, col) in self.board:
+                elif (i, col) in board:
                     break
                 beam.append((i, col))
             beam.clear()
             for i in range(1, 8-col):
-                if (row, col+i) in self.board and self.board[(row, col+i)].color != pieceColor:
+                if (row, col+i) in board and board[(row, col+i)].color != pieceColor:
                     beam.append((row, col+i))
                     if (kingRow, kingCol) == (row, col+i):
                         return beam
                     break
-                elif (row, col+i) in self.board:
+                elif (row, col+i) in board:
                     break
                 beam.append((row, col+i))
             beam.clear()
             for i in range(col-1, -1, -1):
-                if (row, i) in self.board and self.board[(row, i)].color != pieceColor:
+                if (row, i) in board and board[(row, i)].color != pieceColor:
                     beam.append((row, i))  
                     if (kingRow, kingCol) == (row, i):
                         return beam
                     break
-                elif (row, i) in self.board:
+                elif (row, i) in board:
                     break
                 beam.append((row, i))
             beam.clear()
             for i in range(1, min(8-row, 8-col)):
-                if (row+i, col+i) in self.board and self.board[(row+i, col+i)].color != pieceColor:
+                if (row+i, col+i) in board and board[(row+i, col+i)].color != pieceColor:
                     beam.append((row+i, col+i))
                     if (kingRow, kingCol) == (row+i, col+i):
                         return beam
                     break
-                elif (row+i, col+i) in self.board:
+                elif (row+i, col+i) in board:
                     break
                 beam.append((row+i, col+i))
             beam.clear()
             for i in range(1, min(row, col)+1):
-                if (row-i, col-i) in self.board and self.board[(row-i, col-i)].color != pieceColor:
+                if (row-i, col-i) in board and board[(row-i, col-i)].color != pieceColor:
                     beam.append((row-i, col-i))
                     if (kingRow, kingCol) == (row-i, col-i):
                         return beam
                     break
-                elif (row-i, col-i) in self.board:
+                elif (row-i, col-i) in board:
                     break
                 beam.append((row-i, col-i))
             beam.clear()
             for i in range(1, min(row+1, 8-col)):
-                if (row-i, col+i) in self.board and self.board[(row-i, col+i)].color != pieceColor:
+                if (row-i, col+i) in board and board[(row-i, col+i)].color != pieceColor:
                     beam.append((row-i, col+i))
                     if (kingRow, kingCol) == (row-i, col+i):
                         return beam
                     break
-                elif (row-i, col+i) in self.board:
+                elif (row-i, col+i) in board:
                     break
                 beam.append((row-i, col+i))
             beam.clear()
             for i in range(1, min(8-row, col+1)):
-                if (row+i, col-i) in self.board and self.board[(row+i, col-i)].color != pieceColor:
+                if (row+i, col-i) in board and board[(row+i, col-i)].color != pieceColor:
                     beam.append((row+i, col-i))
                     if (kingRow, kingCol) == (row+i, col-i):
                         return beam
                     break
-                elif (row+i, col-i) in self.board:
+                elif (row+i, col-i) in board:
                     break
                 beam.append((row+i, col-i))
             beam.clear()
@@ -733,7 +741,6 @@ class GameBoard(tk.Frame):
             if (row, col+i) in self.board and self.board[(row, col+i)].type.lower() == "p" and self.board[(row, col+i)].color != pieceColor and self.board[(row, col+i)].uniqueCode in self.enpassant:
                 moves.append((row+offset, col+i))
             if (row+offset, col+i) in self.board and self.board[(row+offset, col+i)].color != pieceColor:
-                print("hey")
                 moves.append((row+offset, col+i))
             
 
@@ -935,6 +942,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root, start="rn2k/8/8/8/8/8/7K KQkq b")
+    board = GameBoard(root) #start="r3k/8/8/8/8/8/7K KQkq b")
     print(board.currentToFen())
     board.mainloop()
