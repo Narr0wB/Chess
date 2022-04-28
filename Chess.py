@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 
 my_system = platform.uname()
 
-TIMEFL = 0.00000000150 if my_system.node.lower().find("desktop") == -1 else 0.00150
+TIMEFL = 0.00000000150 if my_system.node.lower().find("desktop") == -1 else 0.000150
 
 """
     TODO list:
@@ -240,22 +240,7 @@ class GameBoard(tk.Frame):
 
     # Given an old position and a new one, place the piece in oldPos in newPos
     def placepiece(self, oldRow: int, oldColumn: int, newRow: int, newColumn: int):
-        if self.board[(oldRow, oldColumn)].type.lower() == "k":
-            if self.board[(oldRow, oldColumn)].color == WHITE:
-                self.whiteKingsideCastle = False
-                self.whiteQueensideCastle = False
-            else:
-                self.blackKingsideCastle = False
-                self.blackQueensideCastle = False
-        if self.board[(oldRow, oldColumn)].uniqueCode == "0r":
-            self.blackQueensideCastle = False
-        elif self.board[(oldRow, oldColumn)].uniqueCode == "1r":
-            self.blackKingsideCastle = False
-        elif self.board[(oldRow, oldColumn)].uniqueCode == "0R":
-            self.whiteQueensideCastle = False
-        elif self.board[(oldRow, oldColumn)].uniqueCode == "1R":
-            self.whiteKingsideCastle = False
-        
+
         # TODO 1: add images of the eaten piece under or over the board
         if (newRow, newColumn) in self.board:
             self.board.pop((newRow, newColumn))
@@ -268,7 +253,6 @@ class GameBoard(tk.Frame):
         x1 = (newColumn * self.size) + int(self.size/2)
         y1 = (newRow * self.size) + int(self.size/2)
         for i in range(self.animationFps+1):
-            sleep(TIMEFL/self.animationFps)
             self.canvas.coords(self.board[(newRow, newColumn)].uniqueCode, x0+((x1-x0)/self.animationFps)*i, y0+((y1-y0)/self.animationFps)*i)
             self.canvas.update()
 
@@ -310,26 +294,26 @@ class GameBoard(tk.Frame):
                 elif self.board[self.selectedPiece].uniqueCode == "1R":
                     self.whiteKingsideCastle = False
                 if self.board[self.selectedPiece].type == "K":
+                    if dropCoords == (7, 2) and self.whiteQueensideCastle:
+                        self.placepiece(7, 0, 7, 3)
+                    elif dropCoords == (7, 6) and self.whiteKingsideCastle:
+                        self.placepiece(7, 7, 7, 5)
                     self.whiteKingsideCastle = False
                     self.whiteQueensideCastle = False
-                    if dropCoords == (7, 2):
-                        self.placepiece(7, 0, 7, 3)
-                    elif dropCoords == (7, 6):
-                        self.placepiece(7, 7, 7, 5)
                 elif self.board[self.selectedPiece].type == "k":
+                    if dropCoords == (0, 2) and self.blackQueensideCastle:
+                        self.placepiece(0, 0, 0, 3)
+                    elif dropCoords == (0, 6) and self.blackKingsideCastle:
+                        self.placepiece(0, 7, 0, 5)
                     self.blackKingsideCastle = False
                     self.blackQueensideCastle = False
-                    if dropCoords == (0, 2):
-                        self.placepiece(0, 0, 0, 3)
-                    elif dropCoords == (0, 6):
-                        self.placepiece(0, 7, 0, 5)
                 offset = 1 if self.board[self.selectedPiece].color else -1
                 if self.board[self.selectedPiece].uniqueCode in self.enpassant:
                     self.enpassant.remove(self.board[self.selectedPiece].uniqueCode)
                 if self.board[self.selectedPiece].type.lower() == "p" and dropCoords[0] == self.selectedPiece[0]+2*offset:
                     self.enpassant.append(self.board[self.selectedPiece].uniqueCode)
                 for i in [1, -1]:
-                    if self.board[self.selectedPiece].type.lower() == "p" and dropCoords == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i):
+                    if (self.selectedPiece[0], self.selectedPiece[1]+i) in self.board and self.board[self.selectedPiece].type.lower() == "p" and dropCoords == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i) and self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode in self.enpassant and self.board[self.selectedPiece].color != self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].color:
                         self.canvas.delete(self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode)
                         self.board.pop((self.selectedPiece[0], self.selectedPiece[1]+i))
                 self.onReleaseMove(self.selectedPiece, dropCoords)
@@ -420,26 +404,26 @@ class GameBoard(tk.Frame):
                 elif self.board[self.selectedPiece].uniqueCode == "1R":
                     self.whiteKingsideCastle = False
                 if self.board[self.selectedPiece].type == "K":
+                    if clickPos == (7, 2) and self.whiteQueensideCastle:
+                        self.placepiece(7, 0, 7, 3)
+                    elif clickPos == (7, 6) and self.whiteKingsideCastle:
+                        self.placepiece(7, 7, 7, 5)
                     self.whiteKingsideCastle = False
                     self.whiteQueensideCastle = False
-                    if clickPos == (7, 2):
-                        self.placepiece(7, 0, 7, 3)
-                    elif clickPos == (7, 6):
-                        self.placepiece(7, 7, 7, 5)
                 elif self.board[self.selectedPiece].type == "k":
+                    if clickPos == (0, 2) and self.blackQueensideCastle:
+                        self.placepiece(0, 0, 0, 3)
+                    elif clickPos == (0, 6) and self.blackKingsideCastle:
+                        self.placepiece(0, 7, 0, 5)
                     self.blackKingsideCastle = False
                     self.blackQueensideCastle = False
-                    if clickPos == (0, 2):
-                        self.placepiece(0, 0, 0, 3)
-                    elif clickPos == (0, 6):
-                        self.placepiece(0, 7, 0, 5)
                 offset = 1 if self.board[self.selectedPiece].color else -1
                 if self.board[self.selectedPiece].uniqueCode in self.enpassant:
                     self.enpassant.remove(self.board[self.selectedPiece].uniqueCode)
                 if self.board[self.selectedPiece].type.lower() == "p" and clickPos[0] == self.selectedPiece[0]+2*offset:
                     self.enpassant.append(self.board[self.selectedPiece].uniqueCode)
                 for i in [1, -1]:
-                    if self.board[self.selectedPiece].type.lower() == "p" and clickPos == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i):
+                    if (self.selectedPiece[0], self.selectedPiece[1]+i) in self.board and self.board[self.selectedPiece].type.lower() == "p" and clickPos == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i) and self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode in self.enpassant and self.board[self.selectedPiece].color != self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].color:
                         self.canvas.delete(self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode)
                         self.board.pop((self.selectedPiece[0], self.selectedPiece[1]+i))
                 self.placepiece(self.selectedPiece[0], self.selectedPiece[1], clickPos[0], clickPos[1])
@@ -749,6 +733,7 @@ class GameBoard(tk.Frame):
             if (row, col+i) in self.board and self.board[(row, col+i)].type.lower() == "p" and self.board[(row, col+i)].color != pieceColor and self.board[(row, col+i)].uniqueCode in self.enpassant:
                 moves.append((row+offset, col+i))
             if (row+offset, col+i) in self.board and self.board[(row+offset, col+i)].color != pieceColor:
+                print("hey")
                 moves.append((row+offset, col+i))
             
 
@@ -950,6 +935,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root)
+    board = GameBoard(root, start="rn2k/8/8/8/8/8/7K KQkq b")
     print(board.currentToFen())
     board.mainloop()
