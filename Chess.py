@@ -136,9 +136,10 @@ class GameBoard(tk.Frame):
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
         self.parent.bind("<F8>", lambda event: print(self.moveLog, len(self.moveLog)))
         self.parent.bind("<F11>", self.toggle_fullscreen)
+        self.parent.bind("<F5>", lambda e: self.loadBoard(start))
         self.drawBoard()
-        self.after(16, self.refresh)
         self.fromFen(start)
+        self.after(16, self.refresh)
     
     def toggle_fullscreen(self, event):
         self.fullscreen = not self.fullscreen
@@ -165,6 +166,19 @@ class GameBoard(tk.Frame):
                 self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=color, tags=(f"{row}, {col}","square"))
                 color = self.boardColor1 if color == self.boardColor2 else self.boardColor2
         
+    def loadBoard(self, fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR KQkq w"):
+        self.board.clear()
+        self.oldBoard.clear()
+        self.moves.clear()
+        self.enpassant.clear()
+        self.selectedPiece = ()
+        log = self.moveLog
+        self.moveLog = ""
+
+        self.canvas.delete("piece")
+        self.fromFen(fen)
+
+        return log
 
     # Load a board from a FEN notation
     def fromFen(self, fen: str):
@@ -323,7 +337,9 @@ class GameBoard(tk.Frame):
                 y1 = (self.selectedPiece[0] * self.size) + int(self.size/2)
                 self.canvas.coords(self.board[self.selectedPiece].uniqueCode, x1, y1)
         except:
-            pass
+            x1 = (self.selectedPiece[1] * self.size) + int(self.size/2)
+            y1 = (self.selectedPiece[0] * self.size) + int(self.size/2)
+            self.canvas.coords(self.board[self.selectedPiece].uniqueCode, x1, y1)
 
 
     def onDrag(self, event):
@@ -389,50 +405,53 @@ class GameBoard(tk.Frame):
 
             # If the user clicks on a move
             elif clickPos in self.moves:
-                if self.selectedPiece[0] % 2 != 0:
-                    self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2)
-                else:
-                    self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1)
-                if self.board[self.selectedPiece].uniqueCode == "0r":
-                    self.blackQueensideCastle = False
-                elif self.board[self.selectedPiece].uniqueCode == "1r":
-                    self.blackKingsideCastle = False
-                elif self.board[self.selectedPiece].uniqueCode == "0R":
-                    self.whiteQueensideCastle = False
-                elif self.board[self.selectedPiece].uniqueCode == "1R":
-                    self.whiteKingsideCastle = False
-                if self.board[self.selectedPiece].type == "K":
-                    if clickPos == (7, 2) and self.whiteQueensideCastle:
-                        self.placepiece(7, 0, 7, 3)
-                    elif clickPos == (7, 6) and self.whiteKingsideCastle:
-                        self.placepiece(7, 7, 7, 5)
-                    self.whiteKingsideCastle = False
-                    self.whiteQueensideCastle = False
-                elif self.board[self.selectedPiece].type == "k":
-                    if clickPos == (0, 2) and self.blackQueensideCastle:
-                        self.placepiece(0, 0, 0, 3)
-                    elif clickPos == (0, 6) and self.blackKingsideCastle:
-                        self.placepiece(0, 7, 0, 5)
-                    self.blackKingsideCastle = False
-                    self.blackQueensideCastle = False
-                offset = 1 if self.board[self.selectedPiece].color else -1
-                if self.board[self.selectedPiece].uniqueCode in self.enpassant:
-                    self.enpassant.remove(self.board[self.selectedPiece].uniqueCode)
-                if self.board[self.selectedPiece].type.lower() == "p" and clickPos[0] == self.selectedPiece[0]+2*offset:
-                    self.enpassant.append(self.board[self.selectedPiece].uniqueCode)
-                for i in [1, -1]:
-                    if (self.selectedPiece[0], self.selectedPiece[1]+i) in self.board and self.board[self.selectedPiece].type.lower() == "p" and clickPos == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i) and self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode in self.enpassant and self.board[self.selectedPiece].color != self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].color:
-                        self.canvas.delete(self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode)
-                        self.board.pop((self.selectedPiece[0], self.selectedPiece[1]+i))
-                self.placepiece(self.selectedPiece[0], self.selectedPiece[1], clickPos[0], clickPos[1])
-                self.currentPlayer = int(not self.currentPlayer)
-                for move in self.moves:
-                    if move[0] % 2 != 0:
-                        self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2)
+                try:
+                    if self.selectedPiece[0] % 2 != 0:
+                        self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2)
                     else:
-                        self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1)
-                self.moves = []
-                self.selectedPiece = ()
+                        self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1)
+                    if self.board[self.selectedPiece].uniqueCode == "0r":
+                        self.blackQueensideCastle = False
+                    elif self.board[self.selectedPiece].uniqueCode == "1r":
+                        self.blackKingsideCastle = False
+                    elif self.board[self.selectedPiece].uniqueCode == "0R":
+                        self.whiteQueensideCastle = False
+                    elif self.board[self.selectedPiece].uniqueCode == "1R":
+                        self.whiteKingsideCastle = False
+                    if self.board[self.selectedPiece].type == "K":
+                        if clickPos == (7, 2) and self.whiteQueensideCastle:
+                            self.placepiece(7, 0, 7, 3)
+                        elif clickPos == (7, 6) and self.whiteKingsideCastle:
+                            self.placepiece(7, 7, 7, 5)
+                        self.whiteKingsideCastle = False
+                        self.whiteQueensideCastle = False
+                    elif self.board[self.selectedPiece].type == "k":
+                        if clickPos == (0, 2) and self.blackQueensideCastle:
+                            self.placepiece(0, 0, 0, 3)
+                        elif clickPos == (0, 6) and self.blackKingsideCastle:
+                            self.placepiece(0, 7, 0, 5)
+                        self.blackKingsideCastle = False
+                        self.blackQueensideCastle = False
+                    offset = 1 if self.board[self.selectedPiece].color else -1
+                    if self.board[self.selectedPiece].uniqueCode in self.enpassant:
+                        self.enpassant.remove(self.board[self.selectedPiece].uniqueCode)
+                    if self.board[self.selectedPiece].type.lower() == "p" and clickPos[0] == self.selectedPiece[0]+2*offset:
+                        self.enpassant.append(self.board[self.selectedPiece].uniqueCode)
+                    for i in [1, -1]:
+                        if (self.selectedPiece[0], self.selectedPiece[1]+i) in self.board and self.board[self.selectedPiece].type.lower() == "p" and clickPos == (self.selectedPiece[0]+offset, self.selectedPiece[1]+i) and self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode in self.enpassant and self.board[self.selectedPiece].color != self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].color:
+                            self.canvas.delete(self.board[(self.selectedPiece[0], self.selectedPiece[1]+i)].uniqueCode)
+                            self.board.pop((self.selectedPiece[0], self.selectedPiece[1]+i))
+                    self.placepiece(self.selectedPiece[0], self.selectedPiece[1], clickPos[0], clickPos[1])
+                    self.currentPlayer = int(not self.currentPlayer)
+                    for move in self.moves:
+                        if move[0] % 2 != 0:
+                            self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2)
+                        else:
+                            self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1)
+                    self.moves = []
+                    self.selectedPiece = ()
+                except:
+                    return
 
     def generateAllLegalMoves(self, color: int):
         allMoves = []
@@ -538,6 +557,7 @@ class GameBoard(tk.Frame):
         
         if pieceType == "k":
             moves = self.kingMoves(row, col)
+
         
         finalMoves = []
         for move in moves:
@@ -731,19 +751,18 @@ class GameBoard(tk.Frame):
         pieceColor = self.board[(row, col)].color
 
         offset = -1 if pieceColor == WHITE else 1
-        if (row+offset, col) in self.board:
-            return moves
 
         moves = [(row+offset, col)]
-        if (row == 6 or row == 1) and not (row+2*offset, col) in self.board:
+        if (row == 6 or row == 1) and not (row+2*offset, col) in self.board and not (row+offset, col) in self.board:
                 moves.append((row+2*offset, col))
         for i in [1, -1]:
             if (row, col+i) in self.board and self.board[(row, col+i)].type.lower() == "p" and self.board[(row, col+i)].color != pieceColor and self.board[(row, col+i)].uniqueCode in self.enpassant:
                 moves.append((row+offset, col+i))
             if (row+offset, col+i) in self.board and self.board[(row+offset, col+i)].color != pieceColor:
                 moves.append((row+offset, col+i))
+        if (row+offset, col) in self.board:
+            moves.remove((row+offset, col))
             
-
         return moves
 
     def knightMoves(self, row: int, col: int) -> list:
