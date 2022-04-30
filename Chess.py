@@ -1,6 +1,8 @@
 import tkinter as tk
 import time
 import platform
+from turtle import back
+from webbrowser import BackgroundBrowser
 from PIL import Image, ImageTk
 
 my_system = platform.uname()
@@ -146,12 +148,30 @@ class GameBoard(tk.Frame):
         self.parent.attributes("-fullscreen", self.fullscreen)
 
     def refresh(self):
+        condition = True
         for key in self.oldBoard:
             for elem in self.board:
+
                 if self.board[elem].uniqueCode == self.oldBoard[key].uniqueCode and key != elem:
                     self.moveLog += f"{columnToLetter[key[1]] + str(key[0])}, {columnToLetter[elem[1]] + str(elem[0])}\n"
+                
+                if self.board[elem].type == "P" and elem[0] == 0:
+
+                    self.addpiece(Piece(QUEEN, self.currentPlayer), elem[0], elem[1])
+                    self.drawpiece(self.board[elem], elem[0], elem[1])
+                
+                if self.board[elem].type == "p" and elem[0] == 7:
+
+                    self.addpiece(Piece(QUEEN, self.currentPlayer), elem[0], elem[1])
+                    self.drawpiece(self.board[elem], elem[0], elem[1])
+                    
         self.oldBoard = self.board.copy()
-        self.after(16, self.refresh)
+
+        if condition:
+            self.after(16, self.refresh)
+
+    def move(self, event):
+        print(event.x, event.y)
 
     def drawBoard(self):
         color = self.boardColor2
@@ -167,6 +187,15 @@ class GameBoard(tk.Frame):
                 color = self.boardColor1 if color == self.boardColor2 else self.boardColor2
         
     def loadBoard(self, fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR KQkq w"):
+        if self.selectedPiece[0] % 2 != 0:
+                self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2)
+        else:
+            self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor2) if (8*(self.selectedPiece[0]) + self.selectedPiece[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{self.selectedPiece[0]}, {self.selectedPiece[1]}", fill=self.boardColor1)
+        for move in self.moves:
+            if move[0] % 2 != 0:
+                self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2)
+            else:
+                self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1)
         self.board.clear()
         self.oldBoard.clear()
         self.moves.clear()
@@ -380,7 +409,7 @@ class GameBoard(tk.Frame):
                         self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2)
                     else:
                         self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor2) if (8*(move[0]) + move[1] + 1) % 2 == 0 else self.canvas.itemconfig(f"{move[0]}, {move[1]}", fill=self.boardColor1)
-                    self.selectedPiece = ()
+                self.selectedPiece = ()
 
             # If the user clicks on another piece
             elif clickPos not in self.moves:
@@ -961,6 +990,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root) #start="r3k/8/8/8/8/8/7K KQkq b")
+    board = GameBoard(root) #, start="k7/2P5/8/8/8/p7/7K KQkq b")
     print(board.currentToFen())
     board.mainloop()
