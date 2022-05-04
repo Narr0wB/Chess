@@ -1,7 +1,28 @@
 #include "Evaluate.h"
 
-std::pair<Tile, Tile> findBestMove(Chess::Board board) {
-        
+std::pair<Tile, Tile> findBestMove(Chess::Board board, uint color) {
+
+    std::pair<Tile, Tile> bestMove;
+    float bestMoveScore = 100000000;
+
+    for (Tile t : board.getTiles()) {
+        if (board.getPiece(t).Color == color) {
+            for (Tile move : Chess::generateLegalMoves(board, t)) {
+                board.movePiece(t, move);
+
+                float score = moveScore(board, color, false, 0);
+
+                board.movePiece(move, t);
+
+                if (score < bestMoveScore) {
+                    bestMove = std::pair<Tile, Tile>(t, move);
+                    bestMoveScore = score;
+                }
+            }
+        }
+    }
+
+    return bestMove;  
 }
 
 float moveScore(Chess::Board board, uint color, bool isMax, uint depth) {
@@ -30,7 +51,7 @@ float moveScore(Chess::Board board, uint color, bool isMax, uint depth) {
         float worst = 1000000000;
 
         for (Tile t : board.getTiles()) {
-            if (board.getPiece(t).Color != color)
+            if (board.getPiece(t).Color != color && color != -1)
                 for (Tile move : Chess::generateLegalMoves(board, t))
                 {   
                     board.movePiece(t, move);

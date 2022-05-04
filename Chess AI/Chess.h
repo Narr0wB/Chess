@@ -58,6 +58,25 @@ namespace Chess {
 
         
     };
+
+
+    // Chess engine functions migrated from python to C++
     
     std::vector<Tile> generateLegalMoves(Board board, Tile pos);
+
+    std::vector<Tile> generateLegalMovesNoSafety(Board board, Tile pos);
+
+    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board board, uint currentPlayer);
+
+    std::vector<Tile> pawnMoves(Board board, Tile pos);
+
+    std::vector<Tile> rookMoves(Board board, Tile pos);
+
+    std::vector<Tile> bishopMoves(Board board, Tile pos);
+
+    std::vector<Tile> knightMoves(Board board, Tile pos);
+
+    std::vector<Tile> queenMoves(Board board, Tile pos);
+
+    std::vector<Tile> kingMoves(Board board, Tile pos);
 }

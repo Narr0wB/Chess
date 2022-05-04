@@ -1,4 +1,4 @@
-#include "Evaluate.h"
+#include "Chess.h"
 
 namespace Chess {
     
@@ -98,5 +98,24 @@ namespace Chess {
             fenStr += "/";
         }
         return fenStr;
+    }
+
+
+    std::vector<Tile> Chess::generateLegalMoves(Chess::Board board, Tile pos) {
+        
+
+    }
+
+    std::vector<Tile> Chess::generateLegalMovesNoSafety(Chess::Board board, Tile pos) {
+        
+
+    }
+
+    std::map<Tile, std::vector<Tile>> Chess::checkForKingSafety(Chess::Board board, uint color) {
+
+    }
+
+    std::vector<Tile> Chess::pawnMoves(Chess::Board board, Tile pos) {
+        
     }
 }
