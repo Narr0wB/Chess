@@ -4,6 +4,9 @@
 #include <stdexcept>
 #include <iostream>
 #include <map>
+#include <algorithm>
+
+#include "Utils.h"
 
 #define KING 0
 #define QUEEN 1
@@ -15,8 +18,6 @@
 #define WHITE 0
 #define BLACK 1
 
-typedef unsigned int uint;
-typedef std::pair<uint, uint> Tile;
 
 namespace Chess {
 
@@ -24,8 +25,9 @@ namespace Chess {
     class Piece {
 
         public:
-            int Color;
-            int Type;
+            int color;
+            int type;
+            std::string uniqueCode;
 
             Piece();
 
@@ -38,6 +40,9 @@ namespace Chess {
     class Board {
         private:
             std::map<Tile, Piece> _board;
+            std::vector<Tile> w_kingBeam; // If the white king is in a black piece beam (N, R, Q, B) the beam will be copied here
+            std::vector<Tile> b_kingBeam; // If the black king is in a white piece beam (N, R, Q, B) the beam will be copied here
+            std::vector<Tile> enpassant;
             bool whiteKingsidecastle = false;
             bool whiteQueensidecastle = false;
             bool blackKingsidecastle = false;
@@ -48,7 +53,13 @@ namespace Chess {
         public:
             Board(std::string fenStr);
 
+            bool inBoard(Tile t);
+
+            int addKingBeam(std::vector<Tile> beam, int kingColor);
+
             std::vector<Tile> getTiles();
+
+            bool inEnpassant(Tile t);
 
             Piece getPiece(Tile t);
 
@@ -62,21 +73,21 @@ namespace Chess {
 
     // Chess engine functions migrated from python to C++
     
-    std::vector<Tile> generateLegalMoves(Board board, Tile pos);
+    std::vector<Tile> generateLegalMoves(Board& board, Tile pos);
 
-    std::vector<Tile> generateLegalMovesNoSafety(Board board, Tile pos);
+    std::vector<Tile> generateLegalMovesNoSafety(Board& board, Tile pos);
 
-    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board board, uint currentPlayer);
+    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board& board, uint currentPlayer);
 
-    std::vector<Tile> pawnMoves(Board board, Tile pos);
+    std::vector<Tile> pawnMoves(Board& board, Tile pos);
 
-    std::vector<Tile> rookMoves(Board board, Tile pos);
+    std::vector<Tile> rookMoves(Board& board, Tile pos);
 
-    std::vector<Tile> bishopMoves(Board board, Tile pos);
+    std::vector<Tile> bishopMoves(Board& board, Tile pos);
 
-    std::vector<Tile> knightMoves(Board board, Tile pos);
+    std::vector<Tile> knightMoves(Board& board, Tile pos);
 
-    std::vector<Tile> queenMoves(Board board, Tile pos);
+    std::vector<Tile> queenMoves(Board& board, Tile pos);
 
-    std::vector<Tile> kingMoves(Board board, Tile pos);
+    std::vector<Tile> kingMoves(Board& board, Tile pos);
 }

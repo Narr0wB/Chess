@@ -6,7 +6,7 @@ std::pair<Tile, Tile> findBestMove(Chess::Board board, uint color) {
     float bestMoveScore = 100000000;
 
     for (Tile t : board.getTiles()) {
-        if (board.getPiece(t).Color == color) {
+        if (board.getPiece(t).color == color) {
             for (Tile move : Chess::generateLegalMoves(board, t)) {
                 board.movePiece(t, move);
 
@@ -34,7 +34,7 @@ float moveScore(Chess::Board board, uint color, bool isMax, uint depth) {
         float best = -1000000000;
 
         for (Tile t : board.getTiles()) {
-            if (board.getPiece(t).Color == color)
+            if (board.getPiece(t).color == color)
                 for (Tile move : Chess::generateLegalMoves(board, t))
                 {   
                     board.movePiece(t, move);
@@ -51,7 +51,7 @@ float moveScore(Chess::Board board, uint color, bool isMax, uint depth) {
         float worst = 1000000000;
 
         for (Tile t : board.getTiles()) {
-            if (board.getPiece(t).Color != color && color != -1)
+            if (board.getPiece(t).color != color && color != -1)
                 for (Tile move : Chess::generateLegalMoves(board, t))
                 {   
                     board.movePiece(t, move);
@@ -71,22 +71,22 @@ float Evaluate(Chess::Board evaluateBoard, uint color) {
     float score = 0;
     for (Tile t : evaluateBoard.getTiles()) {
         Chess::Piece currentPiece = evaluateBoard.getPiece(t);
-        if (currentPiece.Color == color && currentPiece.Type == 0) {
+        if (currentPiece.color == color && currentPiece.type == 0) {
             score += 500;
         }
-        if (currentPiece.Color == color && currentPiece.Type == 1) {
+        if (currentPiece.color == color && currentPiece.type == 1) {
             score += 400;
         }
-        if (currentPiece.Color == color && currentPiece.Type == 2) {
+        if (currentPiece.color == color && currentPiece.type == 2) {
             score += 100;
         }
-        if (currentPiece.Color == color && currentPiece.Type == 3) {
+        if (currentPiece.color == color && currentPiece.type == 3) {
             score += 80;
         }
-        if (currentPiece.Color == color && currentPiece.Type == 4) {
+        if (currentPiece.color == color && currentPiece.type == 4) {
             score += 100;
         }
-        if (currentPiece.Color == color && currentPiece.Type == 5) {
+        if (currentPiece.color == color && currentPiece.type == 5) {
             score += 10;
         }
     }

@@ -136,7 +136,7 @@ class GameBoard(tk.Frame):
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
-        self.parent.bind("<F8>", lambda event: print(self.moveLog, len(self.moveLog)))
+        self.parent.bind("<F8>", lambda event: print(self.currentToFen()))
         self.parent.bind("<F11>", self.toggle_fullscreen)
         self.parent.bind("<F5>", lambda e: self.loadBoard(start))
         self.drawBoard()
@@ -172,6 +172,11 @@ class GameBoard(tk.Frame):
 
     def move(self, event):
         print(event.x, event.y)
+
+    def findPiece(self, uniqueCode: str):
+        for key in self.board:
+            if self.board[key].uniqueCode == uniqueCode:
+                return key
 
     def drawBoard(self):
         color = self.boardColor2
@@ -262,6 +267,12 @@ class GameBoard(tk.Frame):
         if self.blackQueensideCastle:
             fenStr += "q"
         fenStr += " b" if self.currentPlayer else " w"
+        fenStr += " "
+
+        for elem in self.enpassant:
+            if self.board[self.findPiece(elem)].color != self.currentPlayer:
+                fenStr += f"{self.findPiece(elem)[0]}{self.findPiece(elem)[1]}"
+                fenStr += " "
         return fenStr
 
     # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
@@ -783,7 +794,7 @@ class GameBoard(tk.Frame):
 
         moves = [(row+offset, col)]
         if (row == 6 or row == 1) and not (row+2*offset, col) in self.board and not (row+offset, col) in self.board:
-                moves.append((row+2*offset, col))
+            moves.append((row+2*offset, col))
         for i in [1, -1]:
             if (row, col+i) in self.board and self.board[(row, col+i)].type.lower() == "p" and self.board[(row, col+i)].color != pieceColor and self.board[(row, col+i)].uniqueCode in self.enpassant:
                 moves.append((row+offset, col+i))
@@ -799,12 +810,10 @@ class GameBoard(tk.Frame):
 
         pieceColor = self.board[(row, col)].color
 
-        for possibleMove in [(row+1, col+2),(row+1, col-2), (row+2, col+1), (row+2, col-1), (row-1, col+2),(row-1, col-2), (row-2, col+1), (row-2, col-1)]:
-            if possibleMove in self.board and self.board[possibleMove].color == pieceColor:
-                pass
-            else:
+        for possibleMove in [(row+1, col+2), (row+1, col-2), (row+2, col+1), (row+2, col-1), (row-1, col+2), (row-1, col-2), (row-2, col+1), (row-2, col-1)]:
+            if not (possibleMove in self.board and self.board[possibleMove].color == pieceColor) and 0 <= possibleMove[0] <= 8 and 0 <= possibleMove[1] <= 8:
                 moves.append(possibleMove)
-
+                
         return moves
     
     def rookMoves(self, row: int, col: int) -> list:
@@ -990,6 +999,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root) #, start="k7/2P5/8/8/8/p7/7K KQkq b")
+    board = GameBoard(root, start="r6k/8/8/8/8/8/8/K6R KQkq b")
     print(board.currentToFen())
     board.mainloop()
