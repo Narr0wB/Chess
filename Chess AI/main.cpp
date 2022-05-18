@@ -7,7 +7,7 @@ int main(int argc, char* argv[]) {
     //board.movePiece(Tile(0, 0), Tile(3, 3));
     
     std::cout << board.toFen() << std::endl;
-    std::cout << vectp(Chess::rookMoves(board, Tile(0, 0)));
+    std::cout << vectp(Chess::findBeam(board, Tile(3, 4)));
     return 0;
 
 }

@@ -77,7 +77,9 @@ namespace Chess {
 
     std::vector<Tile> generateLegalMovesNoSafety(Board& board, Tile pos);
 
-    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board& board, uint currentPlayer);
+    std::vector<Tile> findBeam(Board& board, Tile pos);
+
+    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board& board, int currentPlayer);
 
     std::vector<Tile> pawnMoves(Board& board, Tile pos);
 
