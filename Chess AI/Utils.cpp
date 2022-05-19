@@ -12,3 +12,11 @@ std::string vectp(std::vector<Tile> vec) {
     }
     return vecp_return;
 }
+
+bool invect(std::vector<Tile> haystack, Tile needle) {
+    for (auto element : haystack) {
+        if (element.first == needle.first && element.second == needle.second)
+        return true;
+    }
+    return false;
+}

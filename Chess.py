@@ -999,6 +999,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root, start="r6k/8/8/4q3/8/8/8/K6R KQkq b")
+    board = GameBoard(root, start="7r/8/8/4k3/8/8/8/K6R/ KQkq b")
     print(board.currentToFen())
     board.mainloop()

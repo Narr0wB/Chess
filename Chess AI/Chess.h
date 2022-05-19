@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
+#include <bitset>
 
 #include "Utils.h"
 
@@ -18,22 +19,22 @@
 #define WHITE 0
 #define BLACK 1
 
+typedef std::vector<std::bitset<8>> Bitboard;
 
 namespace Chess {
-
 
     class Piece {
 
         public:
-            int color;
-            int type;
+            short color;
+            short type;
             std::string uniqueCode;
 
             Piece();
 
             Piece(char fenChr);
 
-            Piece(int pType, int pColor);
+            Piece(short pType, short pColor);
 
     };
 
@@ -55,7 +56,7 @@ namespace Chess {
 
             bool inBoard(Tile t);
 
-            int addKingBeam(std::vector<Tile> beam, int kingColor);
+            short addKingBeam(std::vector<Tile> beam, short kingColor);
 
             std::vector<Tile> getTiles();
 
@@ -70,6 +71,10 @@ namespace Chess {
         
     };
 
+    // bitboard functions
+
+    Bitboard kingMask(Tile pos);
+
 
     // Chess engine functions migrated from python to C++
     
@@ -77,9 +82,11 @@ namespace Chess {
 
     std::vector<Tile> generateLegalMovesNoSafety(Board& board, Tile pos);
 
+    bool generateAllLegalMoves(Board& board, Tile move, short color);
+
     std::vector<Tile> findBeam(Board& board, Tile pos);
 
-    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board& board, int currentPlayer);
+    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board& board, short currentPlayer);
 
     std::vector<Tile> pawnMoves(Board& board, Tile pos);
 

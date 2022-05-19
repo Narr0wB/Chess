@@ -13,7 +13,7 @@ namespace Chess {
         if (!isupper(fenChr)) color = 1;
     }
 
-    Piece::Piece(int pType, int pColor) : type(pType), color(pColor) {}
+    Piece::Piece(short pType, short pColor) : type(pType), color(pColor) {}
 
 
 
@@ -29,7 +29,7 @@ namespace Chess {
         size_t space = fenStr.find(" ");
         for (size_t i = 0; i < fenStr.length(); i++) {
             if (i > space && std::isdigit(fenStr[i])) {
-                enpst.emplace_back((int)fenStr[i] - '0');
+                enpst.emplace_back((short)fenStr[i] - '0');
                 if ((counter % 2) == 0) {
                     enpassant.emplace_back(enpst[0], enpst[1]);
                     enpst.clear();
@@ -37,7 +37,7 @@ namespace Chess {
                 counter++;
             }
             if (fenStr[i] == '/') { row++; col = 0; } 
-            else if (i < space && std::isdigit(fenStr[i]))  { col += (int)fenStr[i] - '0'; }
+            else if (i < space && std::isdigit(fenStr[i]))  { col += (short)fenStr[i] - '0'; }
             else if (i < space) 
             {   
                 _board.insert( std::pair<Tile, Piece>(Tile(row, col), Piece(fenStr[i])) );
@@ -86,8 +86,8 @@ namespace Chess {
     std::string Board::toFen() {
         std::string fenStr = "";
         uint spaces = 0;
-        for (int row = 0; row < 8; row++) {
-            for (int col = 0; col < 8; col++) {
+        for (short row = 0; row < 8; row++) {
+            for (short col = 0; col < 8; col++) {
                 if (_board.find(Tile(row, col)) != _board.end())
                 {   
                     if (spaces > 0) fenStr += std::to_string(spaces);
@@ -118,12 +118,27 @@ namespace Chess {
     }
 
     bool Board::inEnpassant(Tile t) {
-        for (auto element : enpassant) {
+        for (Tile element : enpassant) {
             if (element.first == t.first && element.second == t.second){
                 return true;
             }
         }
         return false;
+    }
+
+    Bitboard kingMask(Tile pos) {
+        Bitboard kM;
+        for (short i = 0; i < 8; i++) {
+            kM.emplace_back(std::string("00000000"));
+        }
+
+        for (Tile possible : {Tile(pos.first, pos.second+1), Tile(pos.first, pos.second-1), Tile(pos.first+1, pos.second), Tile(pos.first-1, pos.second), Tile(pos.first-1, pos.second-1), Tile(pos.first-1, pos.second+1), Tile(pos.first+1, pos.second+1), Tile(pos.first+1, pos.second-1)}) {
+            if (isinbtw(possible.first, 8, -1) && isinbtw(possible.second, 8, -1)) {
+                kM[possible.first].flip(7-possible.second);
+            }
+        }
+        
+        return kM;
     }
 
 
@@ -137,19 +152,67 @@ namespace Chess {
 
     }
 
-    std::map<Tile, std::vector<Tile>> checkForKingSafety(Chess::Board& board, uint color) {
+    std::map<Tile, std::vector<Tile>> checkForKingSafety(Chess::Board& board, short currentPlayer) {
 
     }
+
+    bool checkIfInAllLegalMoves(Chess::Board& board, Tile move, short currentPlayer) {
+        std::vector<Tile> boardTiles = board.getTiles();
+        for (Tile element : boardTiles) {
+            short elemColor = board.getPiece(element).color;
+            short elemType = board.getPiece(element).type;
+            if (elemColor == currentPlayer && elemType != KING) {
+                switch (elemType)
+                {
+                case PAWN:
+                    if (invect(Chess::pawnMoves(board, element), move))
+                    return true;
+                    break;
+                case KNIGHT:
+                    if (invect(Chess::knightMoves(board, element), move))
+                    return true; 
+                    break;
+                case ROOK:
+                    if (invect(Chess::rookMoves(board, element), move))
+                    return true; 
+                    break;
+                case BISHOP:
+                    if (invect(Chess::bishopMoves(board, element), move))
+                    return true; 
+                    break;
+                case QUEEN:
+                    if (invect(Chess::queenMoves(board, element), move))
+                    return true; 
+                    break;
+                }
+            }
+            else if (elemColor == currentPlayer && elemType == KING) {
+                if (invect({Tile(element.first, element.second+1), Tile(element.first, element.second-1), Tile(element.first+1, element.second), Tile(element.first-1, element.second), Tile(element.first-1, element.second-1), Tile(element.first-1, element.second+1), Tile(element.first+1, element.second+1), Tile(element.first+1, element.second-1)}, move))
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+
+
+
+
+
+
+    // Check for king's safety utilities ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     std::vector<Tile> findBeam(Chess::Board& board, Tile pos) {
         std::vector<Tile> beam;
 
-        int pieceColor = board.getPiece(pos).color;
-        int pieceType = board.getPiece(pos).type;
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
 
         switch (pieceType) {
             case ROOK: {
-            for (int i = 1; i < 8-pos.first; i++) {
+            for (short i = 1; i < 8-pos.first; i++) {
                 if (board.inBoard(Tile(pos.first+i, pos.second))) {
                     if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second)).type == KING) {
                         beam.emplace_back(pos.first+i, pos.second);
@@ -165,7 +228,7 @@ namespace Chess {
                 beam.emplace_back(pos.first+i, pos.second);
             }
             beam.clear();
-            for (int i = pos.first-1; i > -1; i--) {
+            for (short i = pos.first-1; i > -1; i--) {
                 if (board.inBoard(Tile(i, pos.second))) {
                     if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second)).type == KING) {
                         beam.emplace_back(pos.first+i, pos.second);
@@ -181,7 +244,7 @@ namespace Chess {
                 beam.emplace_back(i, pos.second);
             }
             beam.clear();
-            for (int i = 1; i < 8-pos.second; i++) {
+            for (short i = 1; i < 8-pos.second; i++) {
                 if (board.inBoard(Tile(pos.first, pos.second+i))) {
                     if (board.getPiece(Tile(pos.first, pos.second+i)).color != pieceColor && board.getPiece(Tile(pos.first, pos.second+i)).type == KING) {
                         beam.emplace_back(pos.first, pos.second+i);
@@ -197,7 +260,7 @@ namespace Chess {
                 beam.emplace_back(pos.first, pos.second+i);
             }
             beam.clear();
-            for (int i = pos.second-1; i > -1; i--) {
+            for (short i = pos.second-1; i > -1; i--) {
                 if (board.inBoard(Tile(pos.first, i))) {
                     if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second)).type == KING) {
                         beam.emplace_back(pos.first+i, pos.second);
@@ -216,7 +279,7 @@ namespace Chess {
             break;
             }
             case BISHOP: {
-            for (int i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
+            for (short i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
                 if (board.inBoard(Tile(pos.first+i, pos.second+i)) && board.getPiece(Tile(pos.first+i, pos.second+i)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second+i)).type == KING) {
                     beam.emplace_back(pos.first+i, pos.second+i);
                     return beam;
@@ -227,7 +290,7 @@ namespace Chess {
                 beam.emplace_back(pos.first+i, pos.second+i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(pos.first, pos.second)+1; i++) {
+            for (short i = 1; i < std::min(pos.first, pos.second)+1; i++) {
                 if (board.inBoard(Tile(pos.first-i, pos.second-i)) && board.getPiece(Tile(pos.first-i, pos.second-i)).color != pieceColor && board.getPiece(Tile(pos.first-i, pos.second-i)).type == KING) {
                     beam.emplace_back(pos.first-i, pos.second-i);
                     return beam;
@@ -238,7 +301,7 @@ namespace Chess {
                 beam.emplace_back(pos.first-i, pos.second-i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
+            for (short i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
                 if (board.inBoard(Tile(pos.first-i, pos.second+i)) && board.getPiece(Tile(pos.first-i, pos.second+i)).color != pieceColor && board.getPiece(Tile(pos.first-i, pos.second+i)).type == KING) {
                     beam.emplace_back(pos.first-i, pos.second+i);
                     return beam;
@@ -249,7 +312,7 @@ namespace Chess {
                 beam.emplace_back(pos.first-i, pos.second+i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
+            for (short i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
                 if (board.inBoard(Tile(pos.first+i, pos.second-i)) && board.getPiece(Tile(pos.first+i, pos.second-i)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second-i)).type == KING) {
                     beam.emplace_back(pos.first+i, pos.second-i);
                     return beam;
@@ -263,7 +326,7 @@ namespace Chess {
             }
             break;
             case QUEEN: {
-            for (int i = 1; i < 8-pos.first; i++) {
+            for (short i = 1; i < 8-pos.first; i++) {
                 if (board.inBoard(Tile(pos.first+i, pos.second))) {
                     if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second)).type == KING) {
                         beam.emplace_back(pos.first+i, pos.second);
@@ -279,7 +342,7 @@ namespace Chess {
                 beam.emplace_back(pos.first+i, pos.second);
             }
             beam.clear();
-            for (int i = pos.first-1; i > -1; i--) {
+            for (short i = pos.first-1; i > -1; i--) {
                 if (board.inBoard(Tile(i, pos.second))) {
                     if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second)).type == KING) {
                         beam.emplace_back(pos.first+i, pos.second);
@@ -295,7 +358,7 @@ namespace Chess {
                 beam.emplace_back(i, pos.second);
             }
             beam.clear();
-            for (int i = 1; i < 8-pos.second; i++) {
+            for (short i = 1; i < 8-pos.second; i++) {
                 if (board.inBoard(Tile(pos.first, pos.second+i))) {
                     if (board.getPiece(Tile(pos.first, pos.second+i)).color != pieceColor && board.getPiece(Tile(pos.first, pos.second+i)).type == KING) {
                         beam.emplace_back(pos.first, pos.second+i);
@@ -311,7 +374,7 @@ namespace Chess {
                 beam.emplace_back(pos.first, pos.second+i);
             }
             beam.clear();
-            for (int i = pos.second-1; i > -1; i--) {
+            for (short i = pos.second-1; i > -1; i--) {
                 if (board.inBoard(Tile(pos.first, i))) {
                     if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second)).type == KING) {
                         beam.emplace_back(pos.first+i, pos.second);
@@ -327,7 +390,7 @@ namespace Chess {
                 beam.emplace_back(pos.first, i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
+            for (short i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
                 if (board.inBoard(Tile(pos.first+i, pos.second+i)) && board.getPiece(Tile(pos.first+i, pos.second+i)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second+i)).type == KING) {
                     beam.emplace_back(pos.first+i, pos.second+i);
                     return beam;
@@ -338,7 +401,7 @@ namespace Chess {
                 beam.emplace_back(pos.first+i, pos.second+i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(pos.first, pos.second)+1; i++) {
+            for (short i = 1; i < std::min(pos.first, pos.second)+1; i++) {
                 if (board.inBoard(Tile(pos.first-i, pos.second-i)) && board.getPiece(Tile(pos.first-i, pos.second-i)).color != pieceColor && board.getPiece(Tile(pos.first-i, pos.second-i)).type == KING) {
                     beam.emplace_back(pos.first-i, pos.second-i);
                     return beam;
@@ -349,7 +412,7 @@ namespace Chess {
                 beam.emplace_back(pos.first-i, pos.second-i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
+            for (short i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
                 if (board.inBoard(Tile(pos.first-i, pos.second+i)) && board.getPiece(Tile(pos.first-i, pos.second+i)).color != pieceColor && board.getPiece(Tile(pos.first-i, pos.second+i)).type == KING) {
                     beam.emplace_back(pos.first-i, pos.second+i);
                     return beam;
@@ -360,7 +423,7 @@ namespace Chess {
                 beam.emplace_back(pos.first-i, pos.second+i);
             }
             beam.clear();
-            for (int i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
+            for (short i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
                 if (board.inBoard(Tile(pos.first+i, pos.second-i)) && board.getPiece(Tile(pos.first+i, pos.second-i)).color != pieceColor && board.getPiece(Tile(pos.first+i, pos.second-i)).type == KING) {
                     beam.emplace_back(pos.first+i, pos.second-i);
                     return beam;
@@ -378,7 +441,7 @@ namespace Chess {
         }
 
 
-    int Board::addKingBeam(std::vector<Tile> beam, int currentPlayer){
+    short Board::addKingBeam(std::vector<Tile> beam, short currentPlayer){
         if (beam.size() > 0) {
             currentPlayer == BLACK ? w_kingBeam = beam : b_kingBeam = beam;
             return 1;
@@ -388,20 +451,28 @@ namespace Chess {
         }
     }
 
+    
+
+
+
+
+
+    // Single piece move generators ---------------------------------------------------------------------------------------------------------------------------------------
+
     std::vector<Tile> pawnMoves(Chess::Board& board, Tile pos) {
         std::vector<Tile> moves;
 
-        int pieceColor = board.getPiece(pos).color;
-        int pieceType = board.getPiece(pos).type;
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
         if (pieceColor == -1 || pieceType != PAWN) return std::vector<Tile>();
 
-        int offset;
+        short offset;
         pieceColor == WHITE ? offset = -1 : offset = 1;
 
         moves.emplace_back(pos.first + offset, pos.second);
         if ((pos.first == 6 || pos.first == 1) && !board.inBoard(Tile(pos.first+2*offset, pos.second)) && !board.inBoard(Tile(pos.first+offset, pos.second)))
             moves.emplace_back(pos.first+2*offset, pos.second);
-        for (auto i : {1, -1}) {
+        for (short i : {1, -1}) {
             if (board.inBoard(Tile(pos.first, pos.second+i)) && board.getPiece(Tile(pos.first, pos.second+i)).type == PAWN && board.getPiece(Tile(pos.first, pos.second+i)).color != pieceColor && board.inEnpassant(Tile(pos.first, pos.second+i))) {
                 moves.emplace_back(pos.first+offset, pos.second+i);
             }
@@ -416,8 +487,8 @@ namespace Chess {
     std::vector<Tile> knightMoves(Chess::Board& board, Tile pos) {
         std::vector<Tile> moves;
 
-        int pieceColor = board.getPiece(pos).color;
-        int pieceType = board.getPiece(pos).type;
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
         if (pieceColor == -1 || pieceType != KNIGHT) return std::vector<Tile>();
 
         for (Tile move : {Tile(pos.first+1, pos.second+2), Tile(pos.first+1, pos.second-2), Tile(pos.first+2, pos.second+1), Tile(pos.first+2, pos.second-1), Tile(pos.first-1, pos.second+2), Tile(pos.first-1, pos.second-2), Tile(pos.first-2, pos.second+1), Tile(pos.first-2, pos.second-1)}) {
@@ -432,11 +503,11 @@ namespace Chess {
     std::vector<Tile> rookMoves(Chess::Board& board, Tile pos) {
         std::vector<Tile> moves;
 
-        int pieceColor = board.getPiece(pos).color;
-        int pieceType = board.getPiece(pos).type;
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
         if (pieceColor == -1 || pieceType != ROOK) return std::vector<Tile>();
 
-        for (int i = 1; i < 8-pos.first; i++) {
+        for (short i = 1; i < 8-pos.first; i++) {
             if (board.inBoard(Tile(pos.first+i, pos.second))) {
                 if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor) {
                     moves.emplace_back(pos.first+i, pos.second);
@@ -445,7 +516,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first+i, pos.second);
         }
-        for (int i = pos.first-1; i > -1; i--) {
+        for (short i = pos.first-1; i > -1; i--) {
             if (board.inBoard(Tile(i, pos.second))) {
                 if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor) {
                     moves.emplace_back(pos.first+i, pos.second);
@@ -454,7 +525,7 @@ namespace Chess {
             }
             moves.emplace_back(i, pos.second);
         }
-        for (int i = 1; i < 8-pos.second; i++) {
+        for (short i = 1; i < 8-pos.second; i++) {
             if (board.inBoard(Tile(pos.first, pos.second+i))) {
                 if (board.getPiece(Tile(pos.first, pos.second+i)).color != pieceColor) {
                     moves.emplace_back(pos.first, pos.second+i);
@@ -463,7 +534,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first, pos.second+i);
         }
-        for (int i = pos.second-1; i > -1; i--) {
+        for (short i = pos.second-1; i > -1; i--) {
             if (board.inBoard(Tile(pos.first, i))) {
                 if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor) {
                     moves.emplace_back(pos.first+i, pos.second);
@@ -480,11 +551,11 @@ namespace Chess {
     std::vector<Tile> bishopMoves(Chess::Board& board, Tile pos) {
         std::vector<Tile> moves;
 
-        int pieceColor = board.getPiece(pos).color;
-        int pieceType = board.getPiece(pos).type;
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
         if (pieceColor == -1 || pieceType != BISHOP) return std::vector<Tile>();
 
-        for (int i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
+        for (short i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
             if (board.inBoard(Tile(pos.first+i, pos.second+i)) && board.getPiece(Tile(pos.first+i, pos.second+i)).color != pieceColor) {
                 moves.emplace_back(pos.first+i, pos.second+i);
                 break;
@@ -494,7 +565,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first+i, pos.second+i);
         }
-        for (int i = 1; i < std::min(pos.first, pos.second)+1; i++) {
+        for (short i = 1; i < std::min(pos.first, pos.second)+1; i++) {
             if (board.inBoard(Tile(pos.first-i, pos.second-i)) && board.getPiece(Tile(pos.first-i, pos.second-i)).color != pieceColor) {
                 moves.emplace_back(pos.first-i, pos.second-i);
                 break;
@@ -504,7 +575,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first-i, pos.second-i);
         }
-        for (int i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
+        for (short i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
             if (board.inBoard(Tile(pos.first-i, pos.second+i)) && board.getPiece(Tile(pos.first-i, pos.second+i)).color != pieceColor) {
                 moves.emplace_back(pos.first-i, pos.second+i);
                 break;
@@ -514,7 +585,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first-i, pos.second+i);
         }
-        for (int i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
+        for (short i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
             if (board.inBoard(Tile(pos.first+i, pos.second-i)) && board.getPiece(Tile(pos.first+i, pos.second-i)).color != pieceColor) {
                 moves.emplace_back(pos.first+i, pos.second-i);
                 break;
@@ -531,11 +602,11 @@ namespace Chess {
     std::vector<Tile> queenMoves(Chess::Board& board, Tile pos) {
         std::vector<Tile> moves;
 
-        int pieceColor = board.getPiece(pos).color;
-        int pieceType = board.getPiece(pos).type;
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
         if (pieceColor == -1 || pieceType != QUEEN) return std::vector<Tile>();
 
-        for (int i = 1; i < 8-pos.first; i++) {
+        for (short i = 1; i < 8-pos.first; i++) {
             if (board.inBoard(Tile(pos.first+i, pos.second))) {
                 if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor) {
                     moves.emplace_back(pos.first+i, pos.second);
@@ -544,7 +615,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first+i, pos.second);
         }
-        for (int i = pos.first-1; i > -1; i--) {
+        for (short i = pos.first-1; i > -1; i--) {
             if (board.inBoard(Tile(i, pos.second))) {
                 if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor) {
                     moves.emplace_back(pos.first+i, pos.second);
@@ -553,7 +624,7 @@ namespace Chess {
             }
             moves.emplace_back(i, pos.second);
         }
-        for (int i = 1; i < 8-pos.second; i++) {
+        for (short i = 1; i < 8-pos.second; i++) {
             if (board.inBoard(Tile(pos.first, pos.second+i))) {
                 if (board.getPiece(Tile(pos.first, pos.second+i)).color != pieceColor) {
                     moves.emplace_back(pos.first, pos.second+i);
@@ -562,7 +633,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first, pos.second+i);
         }
-        for (int i = pos.second-1; i > -1; i--) {
+        for (short i = pos.second-1; i > -1; i--) {
             if (board.inBoard(Tile(pos.first, i))) {
                 if (board.getPiece(Tile(pos.first+i, pos.second)).color != pieceColor) {
                     moves.emplace_back(pos.first+i, pos.second);
@@ -572,7 +643,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first, i);
         }
-        for (int i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
+        for (short i = 1; i < std::min(8-pos.first, 8-pos.second); i++) {
             if (board.inBoard(Tile(pos.first+i, pos.second+i)) && board.getPiece(Tile(pos.first+i, pos.second+i)).color != pieceColor) {
                 moves.emplace_back(pos.first+i, pos.second+i);
                 break;
@@ -582,7 +653,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first+i, pos.second+i);
         }
-        for (int i = 1; i < std::min(pos.first, pos.second)+1; i++) {
+        for (short i = 1; i < std::min(pos.first, pos.second)+1; i++) {
             if (board.inBoard(Tile(pos.first-i, pos.second-i)) && board.getPiece(Tile(pos.first-i, pos.second-i)).color != pieceColor) {
                 moves.emplace_back(pos.first-i, pos.second-i);
                 break;
@@ -592,7 +663,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first-i, pos.second-i);
         }
-        for (int i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
+        for (short i = 1; i < std::min(pos.first+1, 8-pos.second); i++) {
             if (board.inBoard(Tile(pos.first-i, pos.second+i)) && board.getPiece(Tile(pos.first-i, pos.second+i)).color != pieceColor) {
                 moves.emplace_back(pos.first-i, pos.second+i);
                 break;
@@ -602,7 +673,7 @@ namespace Chess {
             }
             moves.emplace_back(pos.first-i, pos.second+i);
         }
-        for (int i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
+        for (short i = 1; i < std::min(8-pos.first, pos.second+1); i++) { 
             if (board.inBoard(Tile(pos.first+i, pos.second-i)) && board.getPiece(Tile(pos.first+i, pos.second-i)).color != pieceColor) {
                 moves.emplace_back(pos.first+i, pos.second-i);
                 break;
@@ -614,5 +685,23 @@ namespace Chess {
         }
 
         return moves;
+    }
+
+    std::vector<Tile> kingMoves(Board& board, Tile pos) {
+        std::vector<Tile> moves;
+
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
+        if (pieceColor == -1 || pieceType != KING) return std::vector<Tile>();
+
+        for (Tile move : {Tile(pos.first, pos.second+1), Tile(pos.first, pos.second-1), Tile(pos.first+1, pos.second), Tile(pos.first-1, pos.second), Tile(pos.first-1, pos.second-1), Tile(pos.first-1, pos.second+1), Tile(pos.first+1, pos.second+1), Tile(pos.first+1, pos.second-1)}) {
+            if (!checkIfInAllLegalMoves(board, move, !pieceColor)) {
+                if (board.getPiece(move).color != pieceColor && isinbtw(move.first, 8, -1) && isinbtw(move.second, 8, -1))
+                moves.emplace_back(move.first, move.second);
+            }
+        }
+
+        return moves;
+        // TODO: add king and queen-side castle
     }
 }
