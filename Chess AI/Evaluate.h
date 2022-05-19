@@ -1,9 +1,9 @@
 
-#include <stdio.h>
+#include <iostream>
 #include "Chess.h"
 
-std::pair<Tile, Tile> findBestMove(Chess::Board board, uint color);
+std::pair<Tile, Tile> findBestMove(Chess::Board& board, short color);
 
-float moveScore(Chess::Board board, uint color, bool isMax, uint depth);
+float moveScore(Chess::Board& board, short color, bool isMax, short depth);
 
-float Evaluate(Chess::Board evaluateBoard, uint color);
+float Evaluate(Chess::Board& evaluateBoard, short color);

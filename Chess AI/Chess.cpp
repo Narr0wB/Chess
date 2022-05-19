@@ -22,12 +22,16 @@ namespace Chess {
 
 
     Board::Board(std::string fenStr) {
+        currentPlayer = 1;
         uint row = 0;
         uint col = 0;
         uint counter = 1;
         std::vector<uint> enpst;
         size_t space = fenStr.find(" ");
         for (size_t i = 0; i < fenStr.length(); i++) {
+            if (fenStr[i] == 'w')  {
+                currentPlayer = 0;
+            }
             if (i > space && std::isdigit(fenStr[i])) {
                 enpst.emplace_back((short)fenStr[i] - '0');
                 if ((counter % 2) == 0) {
@@ -55,7 +59,6 @@ namespace Chess {
             if (i > space && fenStr[i] == 0x71) {
                 blackQueensidecastle = true;
             }
-            if (std::tolower(fenStr[i]) == 0x62) currentPlayer = 1;
             }
         }
     }
@@ -117,6 +120,10 @@ namespace Chess {
         return true;
     }
 
+    short Board::getCurrentPlayer() {
+        return currentPlayer;
+    }
+
     bool Board::inEnpassant(Tile t) {
         for (Tile element : enpassant) {
             if (element.first == t.first && element.second == t.second){
@@ -143,9 +150,32 @@ namespace Chess {
 
 
     std::vector<Tile> generateLegalMoves(Chess::Board& board, Tile pos) {
-        
+        std::vector<Tile> moves;
 
-    }
+        short pieceColor = board.getPiece(pos).color;
+        short pieceType = board.getPiece(pos).type;
+        if (pieceColor == -1) return std::vector<Tile>();
+
+        switch(pieceType) {
+            case PAWN:
+            return Chess::pawnMoves(board, pos);
+            case KNIGHT:
+            return Chess::knightMoves(board, pos);
+            case ROOK:
+            return Chess::rookMoves(board, pos);
+            case BISHOP:
+            return Chess::bishopMoves(board, pos);
+            case QUEEN:
+            return Chess::queenMoves(board, pos);
+            case KING:
+            return Chess::kingMoves(board, pos);
+            default:
+            return std::vector<Tile>();
+        }
+
+        
+        return std::vector<Tile>();
+    }   
 
     std::vector<Tile> generateLegalMovesNoSafety(Chess::Board& board, Tile pos) {
         

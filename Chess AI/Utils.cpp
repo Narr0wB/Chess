@@ -20,3 +20,7 @@ bool invect(std::vector<Tile> haystack, Tile needle) {
     }
     return false;
 }
+
+std::string pairp(Tile t) {
+    return std::string("(") + std::to_string(t.first) + std::string(", ") + std::to_string(t.second) + std::string(")");
+}

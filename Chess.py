@@ -1,8 +1,7 @@
+import subprocess
 import tkinter as tk
 import time
 import platform
-from turtle import back
-from webbrowser import BackgroundBrowser
 from PIL import Image, ImageTk
 
 my_system = platform.uname()
@@ -91,6 +90,12 @@ class Piece:
 def createPiece(fenChr: str) -> Piece:
     return Piece(fenToPiece[fenChr][0], fenToPiece[fenChr][1])
 
+class Event:
+    def __init__(self, x1, y1) -> None:
+        self.x = x1
+        self.y = y1
+
+
 def sleep(ms: float):
     timer = time.time()
     while timer + ms > time.time(): #wait is your sleep time
@@ -98,7 +103,7 @@ def sleep(ms: float):
     
 
 class GameBoard(tk.Frame):
-    def __init__(self, parent, rows=8, columns=8, color1="#EEEED2", color2="#769656", start: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR KQkq w"):
+    def __init__(self, parent, rows=8, columns=8, color1="#EEEED2", color2="#769656", start: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR KQkq w", ai=False):
 
         self.parent = parent
         self.rows = rows
@@ -116,6 +121,10 @@ class GameBoard(tk.Frame):
         self.blackQueensideCastle = False
         self.enpassant = []
         self.moves = []
+        self.useAI = ai
+        if ai:
+            self.ai = subprocess.check_output
+            self.startPlayer = -1
 
         self.board = {}
         self.oldBoard = {}
@@ -147,7 +156,30 @@ class GameBoard(tk.Frame):
         self.fullscreen = not self.fullscreen
         self.parent.attributes("-fullscreen", self.fullscreen)
 
+    def moveAI(self):
+        self.canvas.unbind("<Button-1>")
+        self.canvas.unbind("<B1-Motion>")
+
+        move = self.ai(["Chess AI\chessai", self.currentToFen()]).decode()
+        oldPos = (int(move[0]), int(move[1]))
+        newPos = (int(move[2]), int(move[3]))
+        x = (newPos[1] * self.size) + int(self.size/2)
+        y = (newPos[0] * self.size) + int(self.size/2)
+        self.selectedPiece = oldPos
+        self.moves = self.generateLegalMoves(oldPos[0], oldPos[1])
+        if not newPos in self.moves:
+            self.moves.append(newPos)
+        self.onClick(Event(x, y))
+
+
+        self.canvas.bind("<Button-1>", self.onClick)
+        self.canvas.bind("<B1-Motion>", self.onDrag)
+
+
     def refresh(self):
+        if self.useAI and self.currentPlayer != self.startPlayer:
+            print("AI is calculating...")
+            self.moveAI()
         condition = True
         for key in self.oldBoard:
             for elem in self.board:
@@ -240,6 +272,8 @@ class GameBoard(tk.Frame):
                 self.blackQueensideCastle = True
         for key in self.board:
             self.drawpiece(self.board[key], key[0], key[1])
+        if self.useAI:
+            self.startPlayer = self.currentPlayer
         self.oldBoard = self.board.copy()
         self.canvas.tag_raise("piece")
         self.canvas.tag_lower("square")
@@ -999,6 +1033,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root, start="7r/8/8/4k3/8/8/8/K6R/ KQkq b")
+    board = GameBoard(root, ai=True, start="7r/8/8/4k3/8/8/8/3R3K/ KQkq b")
     print(board.currentToFen())
     board.mainloop()

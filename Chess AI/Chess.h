@@ -6,6 +6,7 @@
 #include <map>
 #include <algorithm>
 #include <bitset>
+#include <iostream>
 
 #include "Utils.h"
 
@@ -48,7 +49,7 @@ namespace Chess {
             bool whiteQueensidecastle = false;
             bool blackKingsidecastle = false;
             bool blackQueensidecastle = false;
-            uint currentPlayer = 0;
+            short currentPlayer = 0;
             
 
         public:
@@ -67,6 +68,8 @@ namespace Chess {
             void movePiece(Tile pos1, Tile pos2);
 
             std::string toFen();
+
+            short getCurrentPlayer();
 
         
     };
