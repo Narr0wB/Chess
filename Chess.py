@@ -161,12 +161,16 @@ class GameBoard(tk.Frame):
         self.canvas.unbind("<B1-Motion>")
 
         move = self.ai(["Chess AI\chessai", self.currentToFen()]).decode()
+        print(move)
         oldPos = (int(move[0]), int(move[1]))
         newPos = (int(move[2]), int(move[3]))
         x = (newPos[1] * self.size) + int(self.size/2)
         y = (newPos[0] * self.size) + int(self.size/2)
         self.selectedPiece = oldPos
-        self.moves = self.generateLegalMoves(oldPos[0], oldPos[1])
+        try:
+            self.moves = self.generateLegalMoves(oldPos[0], oldPos[1])
+        except:
+            pass
         if not newPos in self.moves:
             self.moves.append(newPos)
         self.onClick(Event(x, y))
@@ -178,7 +182,6 @@ class GameBoard(tk.Frame):
 
     def refresh(self):
         if self.useAI and self.currentPlayer != self.startPlayer:
-            print("AI is calculating...")
             self.moveAI()
         condition = True
         for key in self.oldBoard:
@@ -303,10 +306,13 @@ class GameBoard(tk.Frame):
         fenStr += " b" if self.currentPlayer else " w"
         fenStr += " "
 
-        for elem in self.enpassant:
-            if self.board[self.findPiece(elem)].color != self.currentPlayer:
-                fenStr += f"{self.findPiece(elem)[0]}{self.findPiece(elem)[1]}"
-                fenStr += " "
+        try:
+            for elem in self.enpassant:
+                if self.board[self.findPiece(elem)].color != self.currentPlayer:
+                    fenStr += f"{self.findPiece(elem)[0]}{self.findPiece(elem)[1]}"
+                    fenStr += " "
+        except:
+            pass
         return fenStr
 
     # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
@@ -1033,6 +1039,6 @@ class GameBoard(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    board = GameBoard(root, ai=True, start="7r/8/8/4k3/8/8/8/3R3K/ KQkq b")
+    board = GameBoard(root, ai=True)#, ai=True, start="7r/8/8/4k3/8/8/8/3R3K/ KQkq b")
     print(board.currentToFen())
     board.mainloop()

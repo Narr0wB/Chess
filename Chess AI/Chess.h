@@ -42,8 +42,6 @@ namespace Chess {
     class Board {
         private:
             std::map<Tile, Piece> _board;
-            std::vector<Tile> w_kingBeam; // If the white king is in a black piece beam (N, R, Q, B) the beam will be copied here
-            std::vector<Tile> b_kingBeam; // If the black king is in a white piece beam (N, R, Q, B) the beam will be copied here
             std::vector<Tile> enpassant;
             bool whiteKingsidecastle = false;
             bool whiteQueensidecastle = false;
@@ -53,23 +51,21 @@ namespace Chess {
             
 
         public:
-            Board(std::string fenStr);
+            Board(std::string fenStr); // Construct a board object given a fen board
 
-            bool inBoard(Tile t);
+            bool inBoard(Tile t); // Check if there is a piece at a given position (t)
 
-            short addKingBeam(std::vector<Tile> beam, short kingColor);
+            std::vector<Tile> getPiecesPositions(); // Get all the pieces positions
 
-            std::vector<Tile> getTiles();
+            bool inEnpassant(Tile t); // Check if a piece at a given position (t) is eligible for enpassant (it's first move and it has moved by two tiles)
 
-            bool inEnpassant(Tile t);
+            Piece getPiece(Tile t); // Get the piece that is at a given position (t)
 
-            Piece getPiece(Tile t);
+            void movePiece(Tile pos1, Tile pos2); // Move a piece at a give position (pos1) to a new position (pos2)
 
-            void movePiece(Tile pos1, Tile pos2);
+            std::string toFen(); // Return the fen equivalent of the current board
 
-            std::string toFen();
-
-            short getCurrentPlayer();
+            short getCurrentPlayer(); // Get the color of whoever has the right to move
 
         
     };
@@ -81,15 +77,11 @@ namespace Chess {
 
     // Chess engine functions migrated from python to C++
     
-    std::vector<Tile> generateLegalMoves(Board& board, Tile pos);
+    std::vector<Tile> generateLegalMoves(Board& board, Tile pos); // Choose based on the type of the piece at a given position (pos) which one of the move-generating functions to call
 
-    std::vector<Tile> generateLegalMovesNoSafety(Board& board, Tile pos);
-
-    bool generateAllLegalMoves(Board& board, Tile move, short color);
+    bool checkIfInAllLegalMoves(Board& board, Tile move, short color); // Check if a given position (or move) is in the array of possible moves that a side/player can make
 
     std::vector<Tile> findBeam(Board& board, Tile pos);
-
-    std::map<Tile, std::vector<Tile>> checkForKingSafety(Board& board, short currentPlayer);
 
     std::vector<Tile> pawnMoves(Board& board, Tile pos);
 

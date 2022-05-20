@@ -1,17 +1,18 @@
 #include "Evaluate.h"
 
+
+
 std::pair<Tile, Tile> findBestMove(Chess::Board& board, short color) {
 
     std::pair<Tile, Tile> bestMove;
-    float bestMoveScore = 100000000;
+    float bestMoveScore = INFINITY;
 
-    for (Tile t : board.getTiles()) {
+    for (Tile t : board.getPiecesPositions()) {
         if (board.getPiece(t).color == color) {
             for (Tile move : Chess::generateLegalMoves(board, t)) {
                 board.movePiece(t, move);
                 
-                float score = moveScore(board, color, false, 0);
-                std::cout << pairp(move) << " score: " << score << std::max(1, 2) << std::endl;
+                float score = moveScore(board, 0, color);
 
                 board.movePiece(move, t);
 
@@ -27,71 +28,80 @@ std::pair<Tile, Tile> findBestMove(Chess::Board& board, short color) {
     return bestMove;  
 }
 
-float moveScore(Chess::Board& board, short color, bool isMax, short depth) {
-    if (depth == 0) {
-        return Evaluate(board, color);
+float moveScore(Chess::Board board, short depth, short color) {
+    if (depth == (short) 3) {
+        return Evaluate(board);
     }
 
     depth += 1;
-    if (isMax) {
-        float best = -1000000000;
-
-        for (Tile t : board.getTiles()) {
-            if (board.getPiece(t).color == color)
-                for (Tile move : Chess::generateLegalMoves(board, t))
-                {   
+    if (!color) {
+        float maxEval = -INFINITY;
+        for (Tile t : board.getPiecesPositions()) {
+            if (board.getPiece(t).color == color) {
+                for (Tile move : Chess::generateLegalMoves(board, t)) {
                     board.movePiece(t, move);
-                    float score = moveScore(board, !color, !isMax, depth);
-                    best = std::max(best, score);
+                    float eval = moveScore(board, depth, !color);
                     board.movePiece(move, t);
+
+                    if (eval > maxEval) {
+                        maxEval = eval;
+                    }
                 }
-        
+            }
         }
 
-        return best;
+        return maxEval;
+        
     }
     else {
-        float worst = 1000000000;
-
-        for (Tile t : board.getTiles()) {
-            if (board.getPiece(t).color == color)
-                for (Tile move : Chess::generateLegalMoves(board, t))
-                {   
+        float minEval = INFINITY;
+        for (Tile t : board.getPiecesPositions()) {
+            if (board.getPiece(t).color == color) {
+                for (Tile move : Chess::generateLegalMoves(board, t)) {
                     board.movePiece(t, move);
-                    float score = -moveScore(board, !color, !isMax, depth);
-                    worst = std::min(worst, score);
+                    float eval = moveScore(board, depth, !color);
                     board.movePiece(move, t);
+
+                    if (eval < minEval) {
+                        minEval = eval;
+                    }
                 }
-        
+            }
         }
 
-        return worst;
+        return minEval;
     }
+
 }
 
 
-float Evaluate(Chess::Board& evaluateBoard, short color) {
-    float score = 0;
-    for (Tile t : evaluateBoard.getTiles()) {
+float Evaluate(Chess::Board evaluateBoard) {
+    static int evaluateCalls = 0;
+    float blackScore;
+    float whiteScore;
+    for (Tile t : evaluateBoard.getPiecesPositions()) {
         Chess::Piece currentPiece = evaluateBoard.getPiece(t);
-        if (currentPiece.color == color && currentPiece.type == 0) {
-            score += 500;
+        if (currentPiece.type == KING) {
+            currentPiece.color == WHITE ? whiteScore += 900 : blackScore += 900;
         }
-        if (currentPiece.color == color && currentPiece.type == 1) {
-            score += 400;
+        if (currentPiece.type == QUEEN) {
+            currentPiece.color == WHITE ? whiteScore += 90 : blackScore += 90;
         }
-        if (currentPiece.color == color && currentPiece.type == 2) {
-            score += 100;
+        if (currentPiece.type == BISHOP) {
+            currentPiece.color == WHITE ? whiteScore += 30 : blackScore += 30;
         }
-        if (currentPiece.color == color && currentPiece.type == 3) {
-            score += 80;
+        if (currentPiece.type == KNIGHT) {
+            currentPiece.color == WHITE ? whiteScore += 30 : blackScore += 30;
         }
-        if (currentPiece.color == color && currentPiece.type == 4) {
-            score += 100;
+        if (currentPiece.type == ROOK) {
+            currentPiece.color == WHITE ? whiteScore += 50 : blackScore += 50;
         }
-        if (currentPiece.color == color && currentPiece.type == 5) {
-            score += 10;
+        if (currentPiece.type == PAWN) {
+            currentPiece.color == WHITE ? whiteScore += 10 : blackScore += 10;
         }
     }
-    return score;
+
+    evaluateCalls += 1;
+    //std::cout << evaluateCalls << std::endl;
+    return whiteScore - blackScore;
 }
