@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <bitset>
 #include <iostream>
+#include <array>
 
 #include "Utils.h"
 
@@ -29,7 +30,6 @@ namespace Chess {
         public:
             short color;
             short type;
-            std::string uniqueCode;
 
             Piece();
 
@@ -41,16 +41,18 @@ namespace Chess {
 
     class Board {
         private:
-            std::map<Tile, Piece> _board;
             std::vector<Tile> enpassant;
             bool whiteKingsidecastle = false;
             bool whiteQueensidecastle = false;
             bool blackKingsidecastle = false;
             bool blackQueensidecastle = false;
             short currentPlayer = 0;
+            Piece capturedPiece = Piece(-1, -1);
             
 
         public:
+            std::array<std::array<Piece, 8>, 8> _board;
+
             Board(std::string fenStr); // Construct a board object given a fen board
 
             bool inBoard(Tile t); // Check if there is a piece at a given position (t)
@@ -59,9 +61,9 @@ namespace Chess {
 
             bool inEnpassant(Tile t); // Check if a piece at a given position (t) is eligible for enpassant (it's first move and it has moved by two tiles)
 
-            Piece getPiece(Tile t); // Get the piece that is at a given position (t)
+            void movePiece(Tile pos1, Tile pos2); // Move a piece at a given position (pos1) to a new position (pos2)
 
-            void movePiece(Tile pos1, Tile pos2); // Move a piece at a give position (pos1) to a new position (pos2)
+            void undoMove(Tile pos1, Tile pos2); // Undo a move
 
             std::string toFen(); // Return the fen equivalent of the current board
 

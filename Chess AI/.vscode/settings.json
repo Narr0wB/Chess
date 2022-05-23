@@ -54,6 +54,7 @@
         "xlocmes": "cpp",
         "xlocmon": "cpp",
         "xloctime": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "array": "cpp"
     }
 }

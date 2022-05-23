@@ -5,46 +5,53 @@
 std::pair<Tile, Tile> findBestMove(Chess::Board& board, short color) {
 
     std::pair<Tile, Tile> bestMove;
-    float bestMoveScore = INFINITY;
+    int bestMoveScore = INFINITY;
 
-    for (Tile t : board.getPiecesPositions()) {
-        if (board.getPiece(t).color == color) {
-            for (Tile move : Chess::generateLegalMoves(board, t)) {
-                board.movePiece(t, move);
-                
-                float score = moveScore(board, 0, color);
+    for (uint8_t i = 0; i < 8; i++) {
+        for (uint8_t g = 0; g < 8; g++) {
+            if (board._board[i][g].color == color) {
+                for (Tile move : Chess::generateLegalMoves(board, Tile(i, g))) {
+                    Chess::Piece capturedPiece(-1, -1);
+                    capturedPiece = board._board[move.first][move.second];
+                    board.movePiece(Tile(i, g), move);
+                    int score = moveScore(board, 0, !color);
+                    board.movePiece(move, Tile(i, g));
+                    board._board[move.first][move.second] = capturedPiece;
 
-                board.movePiece(move, t);
-
-                if (score < bestMoveScore) {
-                    bestMove.first = t; 
-                    bestMove.second = move;
-                    bestMoveScore = score;
+                    if (score < bestMoveScore) {
+                        bestMove.first = Tile(i, g); 
+                        bestMove.second = move;
+                        bestMoveScore = score;
+                    }
                 }
             }
-        }
-    }
+        }}
 
     return bestMove;  
 }
 
-float moveScore(Chess::Board board, short depth, short color) {
-    if (depth == (short) 3) {
+int moveScore(Chess::Board& board, short depth, short color) {
+    if (depth == (short) 4) {
         return Evaluate(board);
     }
 
     depth += 1;
     if (!color) {
-        float maxEval = -INFINITY;
-        for (Tile t : board.getPiecesPositions()) {
-            if (board.getPiece(t).color == color) {
-                for (Tile move : Chess::generateLegalMoves(board, t)) {
-                    board.movePiece(t, move);
-                    float eval = moveScore(board, depth, !color);
-                    board.movePiece(move, t);
+        int maxEval = -INFINITY;
+        for (uint8_t i = 0; i < 8; i++) {
+            for (uint8_t g = 0; g < 8; g++) {
+                if (board._board[i][g].color == color) {
+                    for (Tile move : Chess::generateLegalMoves(board, Tile(i, g))) {
+                        Chess::Piece capturedPiece(-1, -1);
+                        capturedPiece = board._board[move.first][move.second];
+                        board.movePiece(Tile(i, g), move);
+                        int eval = moveScore(board, depth, !color);
+                        board.movePiece(move, Tile(i, g));
+                        board._board[move.first][move.second] = capturedPiece;
 
-                    if (eval > maxEval) {
-                        maxEval = eval;
+                        if (eval > maxEval) {
+                            maxEval = eval;
+                        }
                     }
                 }
             }
@@ -54,16 +61,21 @@ float moveScore(Chess::Board board, short depth, short color) {
         
     }
     else {
-        float minEval = INFINITY;
-        for (Tile t : board.getPiecesPositions()) {
-            if (board.getPiece(t).color == color) {
-                for (Tile move : Chess::generateLegalMoves(board, t)) {
-                    board.movePiece(t, move);
-                    float eval = moveScore(board, depth, !color);
-                    board.movePiece(move, t);
+        int minEval = INFINITY;
+        for (uint8_t i = 0; i < 8; i++) {
+            for (uint8_t g = 0; g < 8; g++) {
+                if (board._board[i][g].color == color) {
+                    for (Tile move : Chess::generateLegalMoves(board, Tile(i, g))) {
+                        Chess::Piece capturedPiece(-1, -1);
+                        capturedPiece = board._board[move.first][move.second];
+                        board.movePiece(Tile(i, g), move);
+                        int eval = moveScore(board, depth, !color);
+                        board.movePiece(move, Tile(i, g));
+                        board._board[move.first][move.second] = capturedPiece;
 
-                    if (eval < minEval) {
-                        minEval = eval;
+                        if (eval < minEval) {
+                            minEval = eval;
+                        }
                     }
                 }
             }
@@ -75,33 +87,39 @@ float moveScore(Chess::Board board, short depth, short color) {
 }
 
 
-float Evaluate(Chess::Board evaluateBoard) {
-    static int evaluateCalls = 0;
-    float blackScore;
-    float whiteScore;
-    for (Tile t : evaluateBoard.getPiecesPositions()) {
-        Chess::Piece currentPiece = evaluateBoard.getPiece(t);
-        if (currentPiece.type == KING) {
-            currentPiece.color == WHITE ? whiteScore += 900 : blackScore += 900;
-        }
-        if (currentPiece.type == QUEEN) {
-            currentPiece.color == WHITE ? whiteScore += 90 : blackScore += 90;
-        }
-        if (currentPiece.type == BISHOP) {
-            currentPiece.color == WHITE ? whiteScore += 30 : blackScore += 30;
-        }
-        if (currentPiece.type == KNIGHT) {
-            currentPiece.color == WHITE ? whiteScore += 30 : blackScore += 30;
-        }
-        if (currentPiece.type == ROOK) {
-            currentPiece.color == WHITE ? whiteScore += 50 : blackScore += 50;
-        }
-        if (currentPiece.type == PAWN) {
-            currentPiece.color == WHITE ? whiteScore += 10 : blackScore += 10;
+int Evaluate(Chess::Board& evaluateBoard) {
+    //static int evaluateCalls = 0;
+    int score = 0;
+    for (uint8_t i = 0; i < 8; i++) {
+        for (uint8_t g = 0; g < 8; g++) {
+            short color = evaluateBoard._board[i][g].color;
+            if (color == -1)
+                continue;
+            short multiplier = color ? -1 : 1;
+            switch (evaluateBoard._board[i][g].type) {
+                case KING: {
+                    score += 900 * multiplier;
+                }
+                case QUEEN: {
+                    score += 90 * multiplier;
+                }
+                case BISHOP: {
+                    score += 30 * multiplier;
+                }
+                case KNIGHT: {
+                    score += 30 * multiplier;
+                }
+                case ROOK: {
+                    score += 50 * multiplier;
+                }
+                case PAWN: {
+                    score += 10 * multiplier;
+                }
+            }
         }
     }
 
-    evaluateCalls += 1;
+    //evaluateCalls += 1;
     //std::cout << evaluateCalls << std::endl;
-    return whiteScore - blackScore;
+    return score;
 }
