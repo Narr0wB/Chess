@@ -1,7 +1,103 @@
 #include "Evaluate.h"
 
 
+<<<<<<< HEAD
 int Evaluate(Position& evaluateBoard) {
+=======
+
+std::pair<Tile, Tile> findBestMove(Chess::Board& board, short color) {
+
+    std::pair<Tile, Tile> bestMove;
+    int bestMoveScore = INFINITY;
+
+    for (uint8_t i = 0; i < 8; i++) {
+        for (uint8_t g = 0; g < 8; g++) {
+            if (board._board[i][g].color == color) {
+                for (Tile move : Chess::generateLegalMoves(board, Tile(i, g))) {
+                    Chess::Piece capturedPiece(-1, -1);
+                    capturedPiece = board._board[move.first][move.second];
+                    board.movePiece(Tile(i, g), move);
+                    int score = moveScore(board, 0, 0, 0, !color);
+                    board.movePiece(move, Tile(i, g));
+                    board._board[move.first][move.second] = capturedPiece;
+
+                    if (score < bestMoveScore) {
+                        bestMove.first = Tile(i, g); 
+                        bestMove.second = move;
+                        bestMoveScore = score;
+                    }
+                }
+            }
+        }}
+
+    return bestMove;  
+}
+
+int moveScore(Chess::Board& board, short depth, int alpha, int beta, short color) {
+    if (depth == (short) 4) {
+        return Evaluate(board);
+    }
+
+    depth += 1;
+    if (!color) {
+        int maxEval = -INFINITY;
+        for (uint8_t i = 0; i < 8; i++) {
+            for (uint8_t g = 0; g < 8; g++) {
+                if (board._board[i][g].color == color) {
+                    for (Tile move : Chess::generateLegalMoves(board, Tile(i, g))) {
+                        Chess::Piece capturedPiece(-1, -1);
+                        capturedPiece = board._board[move.first][move.second];
+                        board.movePiece(Tile(i, g), move);
+                        int eval = moveScore(board, depth, alpha, beta, !color);
+                        board.movePiece(move, Tile(i, g));
+                        board._board[move.first][move.second] = capturedPiece;
+                        if (eval > maxEval) {
+                            maxEval = eval;
+                        }
+                        if (maxEval >= beta) {
+                            break;
+                        }
+                        alpha = std::max(alpha, maxEval);
+                    }
+                }
+            }
+        }
+
+        return maxEval;
+        
+    }
+    else {
+        int minEval = INFINITY;
+        for (uint8_t i = 0; i < 8; i++) {
+            for (uint8_t g = 0; g < 8; g++) {
+                if (board._board[i][g].color == color) {
+                    for (Tile move : Chess::generateLegalMoves(board, Tile(i, g))) {
+                        Chess::Piece capturedPiece(-1, -1);
+                        capturedPiece = board._board[move.first][move.second];
+                        board.movePiece(Tile(i, g), move);
+                        int eval = moveScore(board, depth, alpha, beta, !color);
+                        board.movePiece(move, Tile(i, g));
+                        board._board[move.first][move.second] = capturedPiece;
+                        if (eval < minEval) {
+                            minEval = eval;
+                        }
+                        if (minEval <= alpha) {
+                            break;
+                        }
+                        beta = std::min(beta, minEval);
+                    }
+                }
+            }
+        }
+
+        return minEval;
+    }
+
+}
+
+
+int Evaluate(Chess::Board& evaluateBoard) {
+>>>>>>> cdda6229f95127c75e0374012812c26c35965902
     //static int evaluateCalls = 0;
     int score = 0;
     Piece* pieces = evaluateBoard.getPieces();
