@@ -11,4 +11,6 @@ std::string vectp(std::vector<Tile> vec); // vector print, returns a string that
 
 bool invect(std::vector<Tile> haystack, Tile needle);
 
+bool is_in_table(std::vector<uint64_t>& table, uint64_t position_hash);
+
 std::string pairp(Tile t);

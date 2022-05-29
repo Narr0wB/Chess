@@ -1,4 +1,4 @@
-#include "Evaluate.h"
+#include "Chess.h"
 
 int moveGenTest(Chess::Board& board, int depth, short color);
 

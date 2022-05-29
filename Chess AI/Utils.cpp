@@ -21,6 +21,15 @@ bool invect(std::vector<Tile> haystack, Tile needle) {
     return false;
 }
 
+bool is_in_table(std::vector<uint64_t>& table, uint64_t position_hash)
+{
+    for (auto elem : table) {
+        if (position_hash == elem)
+            return true;
+    }
+    return false;
+}
+
 std::string pairp(Tile t) {
     return std::string("(") + std::to_string(t.first) + std::string(", ") + std::to_string(t.second) + std::string(")");
 }

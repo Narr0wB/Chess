@@ -80,6 +80,17 @@ columnToLetter = {
     7 : "h"
 }
 
+letterToColumn = {
+    "a" : 0,
+    "b" : 1,
+    "c" : 2,
+    "d" : 3,
+    "e" : 4,
+    "f" : 5,
+    "g" : 6,
+    "h" : 7
+}
+
 class Piece:
     def __init__(self, pieceType: int, color: int):
         self.type = pieceToFen[(pieceType, color)]
@@ -160,10 +171,10 @@ class GameBoard(tk.Frame):
         self.canvas.unbind("<Button-1>")
         self.canvas.unbind("<B1-Motion>")
 
-        move = self.ai(["Chess AI\chessai", self.currentToFen()]).decode()
+        move = self.ai(["Chess AI\ChessAI", self.currentToFen()]).decode()
         print(move)
-        oldPos = (int(move[0]), int(move[1]))
-        newPos = (int(move[2]), int(move[3]))
+        oldPos = (8-int(move[1]), letterToColumn[move[0]])
+        newPos = (8-int(move[3]), letterToColumn[move[2]])
         x = (newPos[1] * self.size) + int(self.size/2)
         y = (newPos[0] * self.size) + int(self.size/2)
         self.selectedPiece = oldPos
@@ -306,13 +317,13 @@ class GameBoard(tk.Frame):
         fenStr += " b" if self.currentPlayer else " w"
         fenStr += " "
 
-        try:
-            for elem in self.enpassant:
-                if self.board[self.findPiece(elem)].color != self.currentPlayer:
-                    fenStr += f"{self.findPiece(elem)[0]}{self.findPiece(elem)[1]}"
-                    fenStr += " "
-        except:
-            pass
+        # try:
+        #     for elem in self.enpassant:
+        #         if self.board[self.findPiece(elem)].color != self.currentPlayer:
+        #             fenStr += f"{self.findPiece(elem)[0]}{self.findPiece(elem)[1]}"
+        #             fenStr += " "
+        # except:
+        #     pass
         return fenStr
 
     # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
@@ -606,18 +617,18 @@ class GameBoard(tk.Frame):
 
     def generateLegalMoves(self, row: int, col: int) -> list:
         moves = []
-        obligatoryMoves = self.checkForKingSafety(self.board)
+        # obligatoryMoves = self.checkForKingSafety(self.board)
 
         if not (row, col) in self.board:
             return moves
                  
         pieceType = self.board[(row, col)].type.lower()
 
-        if obligatoryMoves:
-            if (row, col) in obligatoryMoves:
-                return obligatoryMoves[(row, col)]
-            else:
-                return moves
+        # if obligatoryMoves:
+        #     if (row, col) in obligatoryMoves:
+        #         return obligatoryMoves[(row, col)]
+        #     else:
+        #         return moves
 
 
         if pieceType == "p":
