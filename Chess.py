@@ -877,5 +877,5 @@ class Board():
 
 
 if __name__ == "__main__":
-    board = Board(ai=False, start="k7/7P/8/8/K7/ w")
+    board = Board()
     board.mainloop()
