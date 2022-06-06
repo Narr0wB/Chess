@@ -45,17 +45,17 @@ pieceToFen = {
 
 fenToImage = {
         "k" : Image.open(f"{dir_path}\\assets\\bking.png"),
-        "q" : Image.open(f"{dir_path}\\assets//bqueen.png"),
-        "b" : Image.open(f"{dir_path}\\assets//bbishop.png"),
-        "n" : Image.open(f"{dir_path}\\assets//bhorse.png"),
-        "r" : Image.open(f"{dir_path}\\assets//brook.png"),
-        "p" : Image.open(f"{dir_path}\\assets//bpawn.png"),
-        "K" : Image.open(f"{dir_path}\\assets//wking.png"),
-        "Q" : Image.open(f"{dir_path}\\assets//wqueen.png"),
-        "B" : Image.open(f"{dir_path}\\assets//wbishop.png"),
-        "N" : Image.open(f"{dir_path}\\assets//whorse.png"),
-        "R" : Image.open(f"{dir_path}\\assets//wrook.png"),
-        "P" : Image.open(f"{dir_path}\\assets//wpawn.png"),
+        "q" : Image.open(f"{dir_path}\\assets\\bqueen.png"),
+        "b" : Image.open(f"{dir_path}\\assets\\bbishop.png"),
+        "n" : Image.open(f"{dir_path}\\assets\\bhorse.png"),
+        "r" : Image.open(f"{dir_path}\\assets\\brook.png"),
+        "p" : Image.open(f"{dir_path}\\assets\\bpawn.png"),
+        "K" : Image.open(f"{dir_path}\\assets\\wking.png"),
+        "Q" : Image.open(f"{dir_path}\\assets\\wqueen.png"),
+        "B" : Image.open(f"{dir_path}\\assets\\wbishop.png"),
+        "N" : Image.open(f"{dir_path}\\assets\\whorse.png"),
+        "R" : Image.open(f"{dir_path}\\assets\\wrook.png"),
+        "P" : Image.open(f"{dir_path}\\assets\\wpawn.png"),
     }
 
 fenToPiece = {
@@ -110,21 +110,29 @@ def sleep(ms: float):
         pass
 
 # str-keys only
-def sort_keys(keys: list) -> list:
+def sort_keys(keys: list, crescente: bool = False) -> list:
     keys = list(keys)
     sorted_list = keys.copy() # 3 1 2
     temp_elem = ""
-    for g in range(len(keys)):
-        for i in range(g+1, len(keys)):
-            if int(keys[i][:keys[i].find(" ")]) > int(keys[g][:keys[g].find(" ")]):
-                temp_elem = sorted_list[i]
-                sorted_list[i] = sorted_list[g]
-                sorted_list[g] = temp_elem
+    if crescente:
+        for g in range(len(keys)):
+            for i in range(g+1, len(keys)):
+                if int(keys[i][:keys[i].find(" ")]) < int(keys[g][:keys[g].find(" ")]):
+                    temp_elem = sorted_list[i]
+                    sorted_list[i] = sorted_list[g]
+                    sorted_list[g] = temp_elem
+    else:
+        for g in range(len(keys)):
+            for i in range(g+1, len(keys)):
+                if int(keys[i][:keys[i].find(" ")]) > int(keys[g][:keys[g].find(" ")]):
+                    temp_elem = sorted_list[i]
+                    sorted_list[i] = sorted_list[g]
+                    sorted_list[g] = temp_elem
     
     return sorted_list
 
 class Board():
-    def __init__(self, debug=False, tileSize=100, colorLight="#F0D9B5", colorDark="#B58863", start: str = CHESS_START, ai: bool = False, win_message: str = "won", win_img_path: str = f"{dir_path}\\assets/chess_win.png", start_player: int = -1):
+    def __init__(self, debug=False, tileSize=100, colorLight="#F0D9B5", colorDark="#B58863", start: str = CHESS_START, ai: bool = False, win_message: str = "won", win_img_path: str = f"{dir_path}\\assets\\chess_win.png", start_player: int = -1):
         self.debug = debug
 
         self.parent = tk.Tk()
@@ -157,6 +165,7 @@ class Board():
         self.move_log_r = ""
         self.win_text = win_message if len(win_message) < 20 else "won"
         self.win_image = ImageTk.PhotoImage(Image.open(win_img_path).resize((500, 350), Image.ANTIALIAS))
+        self.draw_image = ImageTk.PhotoImage(Image.open(f"{dir_path}\\assets\\chess_draw.png").resize((500, 350), Image.ANTIALIAS))
 
         self.auxiliary_pieces = [ImageTk.PhotoImage(fenToImage["q"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["b"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["r"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["n"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["Q"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["B"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["R"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["N"].resize((int(100*(self.size/95)),int(100*(self.size/95)))))]
         self.done = tk.BooleanVar(False)
@@ -193,13 +202,19 @@ class Board():
         self.parent.bind("<F5>", lambda e: self.loadBoard(start))
         self.parent.bind("<F6>", self.restore_move)
         if self.debug:
-            self.parent.bind("<F7>", lambda e: print(self.movelog.keys(), "\n"))
+            self.parent.bind("<F7>", self.print_move_log)
 
         self.fromFen(start)
         self.parent.after(500, self.refresh)
     
     def mainloop(self):
         self.parent.mainloop()
+
+    def print_move_log(self, event):
+        os.system("cls")
+        sorted_key_list = sort_keys(self.movelog.keys(), True)
+        for element in sorted_key_list:
+            print(element[:len(element)-3] + "player: " + ("BLACK" if int(element[len(element)-3]) else "WHITE") + " enpassant: " + ("TRUE" if int(element[len(element)-1]) else "FALSE"))
 
     def on_resize(self, event):
         self.parent.update()
@@ -224,7 +239,15 @@ class Board():
         self.canvas.create_image(centreX, centreY-70, image=self.win_image, tags="win")
 
     def on_draw(self):
-        pass
+        centreX = self.parent.winfo_width() // 2
+        centreY = self.parent.winfo_height() // 2
+        x0 = centreX - 300
+        y0 = centreY - 260
+        x1 = centreX + 300
+        y1 = centreY + 260
+        self.canvas.create_rectangle(x0, y0, x1, y1, fill=self.boardColor1, tags="draw")
+        self.canvas.create_text(centreX, centreY+130, text=f"Draw!", fill="black", font=('Calibri 25 bold'), tags="draw")
+        self.canvas.create_image(centreX, centreY-70, image=self.draw_image, tags="draw")
 
     def createPiece(self, fenChr: str) -> Piece:    
         return Piece(fenToPiece[fenChr][0], fenToPiece[fenChr][1], ImageTk.PhotoImage(fenToImage[fenChr].resize((int(100*(self.size/95)),int(100*(self.size/95))), Image.ANTIALIAS)))
@@ -343,18 +366,13 @@ class Board():
         self.movelog[new_move_key] = eatenPiece
         
     def refresh(self):
-        #print(len(self.generateAllLegalMoves(self.board, self.currentPlayer)) == 0, self.currentPlayer, self.generateAllLegalMoves(self.board, self.currentPlayer))
         if len(self.generateAllLegalMoves(self.board, self.currentPlayer)) == 0 and self.in_check(self.board, self.currentPlayer):
             self.on_win()
+        elif len(self.generateAllLegalMoves(self.board, self.currentPlayer)) == 0:
+            self.on_draw()
+
         if self.useAI and self.currentPlayer != self.startPlayer and self.animations_done:
             self.moveAI()
-        for key in self.oldBoard:
-            for elem in self.board:
-
-                if self.board[elem].uniqueCode == self.oldBoard[key].uniqueCode and key != elem:
-                    self.move_log_r += f"{columnToLetter[key[1]] + str(key[0])}, {columnToLetter[elem[1]] + str(elem[0])}\n"
-                    
-        self.oldBoard = self.board.copy()
 
         self.parent.after(500, self.refresh)
 
@@ -427,6 +445,7 @@ class Board():
 
         self.canvas.delete("piece")
         self.canvas.delete("win")
+        self.canvas.delete("draw")
         self.fromFen(fen)
 
 
@@ -1173,5 +1192,5 @@ class Board():
 
 
 if __name__ == "__main__":
-    board = Board(debug=True, ai=True, win_message="EDDU!!!", start_player=BLACK, win_img_path="C:\\Users\\Ilias\\Downloads\\win.png", start="rnbq1bnr/ppp1p1pp/3k4/3Q4/8/2N1P3/PPPP1PPP/R1B1KBNR/ b KQ") #start="r3kbnr/p1pp1ppp/b1n2q2/1p2p3/1P2P3/B1N2Q2/P1PP1PPP/R3KBNR/ w KQkq") #start="rnb1kbnr/ppqppp1p/8/8/2P5/3Q4/PP2PPPp/RNB1KBNR w KQkq c3 0 6")
+    board = Board(debug = True)
     board.mainloop()
