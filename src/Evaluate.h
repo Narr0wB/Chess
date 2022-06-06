@@ -15,7 +15,6 @@ const int black_pawn_table[64] = {  0,  0,  0,  0,  0,  0,  0,  0,
                                     5, 10, 10,-20,-20, 10, 10,  5,
                                     0,  0,  0,  0,  0,  0,  0,  0 };
 
-<<<<<<< HEAD
 const int white_pawn_table[64] = { 0,  0,  0,  0,  0,  0,  0,  0,
                                    5, 10, 10,-20,-20, 10, 10,  5,
                                    5, -5,-10,  0,  0,-10, -5,  5,
@@ -24,9 +23,6 @@ const int white_pawn_table[64] = { 0,  0,  0,  0,  0,  0,  0,  0,
                                    10, 10, 20, 30, 30, 20, 10, 10,
                                    50, 50, 50, 50, 50, 50, 50, 50,
                                     0,  0,  0,  0,  0,  0,  0,  0 };
-=======
-int moveScore(Chess::Board& board, short depth, int alpha, int beta, short color);
->>>>>>> cdda6229f95127c75e0374012812c26c35965902
 
 const int knight_table[64] = { -50,-40,-30,-30,-30,-30,-40,-50,
                                -40,-20,  0,  0,  0,  0,-20,-40,
@@ -159,12 +155,11 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
 
             if (eval > maxEval)
                 maxEval = eval;
-            if (eval >= Bbeta)
-                break;
-            
-
             if (eval > Aalpha)
                 Aalpha = eval;
+
+            if (eval >= Bbeta)
+                break;
         }
 
         return maxEval;
@@ -178,11 +173,11 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
 
             if (eval < minEval)
                 minEval = eval;
-            if (eval <= Aalpha)
-                break;
-         
             if (eval < Bbeta)
                 Bbeta = eval;
+
+            if (eval <= Aalpha)
+                break;
         }
 
         return minEval;

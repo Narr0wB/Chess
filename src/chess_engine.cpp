@@ -1,8 +1,6 @@
 #include <iostream>
 #include <chrono>
 #include "tables.h"
-//#include "position.h"
-//#include "types.h"
 #include "Evaluate.h"
 
 
@@ -85,14 +83,14 @@ int main(int argc, char* argv[]) {
 	zobrist::initialise_zobrist_keys();
 
 
-	//Position p;
-	//Position::set(argv[1], p);
+	Position p;
+	Position::set(argv[1], p);
 
-	//std::cout << findBestMove<BLACK>(p, 6) << std::endl;
-	//std::cout << mSCalls << std::endl;
+	std::cout << findBestMove<BLACK>(p, 4) << std::endl;
+	std::cout << mSCalls << std::endl;
 	
 
-	while (1) {
+	/*while (1) {
 		std::string fen;
 		std::getline(std::cin, fen);
 		Position p;
@@ -101,7 +99,7 @@ int main(int argc, char* argv[]) {
 		std::cout << "Board evaluation: " << Evaluate(p) << std::endl;
 		std::cout << "Move: " << findBestMove<BLACK>(p, 4) << std::endl;
 		std::cout << "Nodes searched: " << mSCalls << std::endl;
-	}
+	}*/
 
 	
 	return 0;
