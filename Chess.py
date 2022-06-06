@@ -2,7 +2,6 @@ import subprocess
 import tkinter as tk
 import time
 import platform
-from turtle import color
 from PIL import Image, ImageTk
 
 my_system = platform.uname()
@@ -123,7 +122,7 @@ def sort_keys(keys: list) -> list:
     return sorted_list
 
 class Board():
-    def __init__(self, debug=False, tileSize=100, colorLight="#F0D9B5", colorDark="#B58863", start: str = CHESS_START, ai=False, win_message="won"):
+    def __init__(self, debug=False, tileSize=100, colorLight="#F0D9B5", colorDark="#B58863", start: str = CHESS_START, ai: bool = False, win_message: str = "won", win_img_path: str = "assets/chess_win.png", start_player: int = -1):
         self.debug = debug
 
         self.parent = tk.Tk()
@@ -140,7 +139,7 @@ class Board():
         self.blackKingsideCastle = False
         self.blackQueensideCastle = False
 
-        self.currentPlayer = WHITE
+        self.currentPlayer = start_player
         self.selectedPiece = ()
         self.enpassant = []
         self.moves = []
@@ -148,13 +147,14 @@ class Board():
         self.useAI = ai
         if self.useAI:
             self.ai = subprocess.check_output
-            self.startPlayer = -1
+        self.startPlayer = start_player if start_player != -1 else WHITE if start[start.find(" ")+1] == "w" else BLACK
 
         self.board = {}
         self.oldBoard = {}
         self.movelog = {}
         self.move_log_r = ""
         self.win_text = win_message if len(win_message) < 20 else "won"
+        self.win_image = ImageTk.PhotoImage(Image.open(win_img_path).resize((500, 350), Image.ANTIALIAS))
 
         self.auxiliary_pieces = [ImageTk.PhotoImage(fenToImage["q"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["b"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["r"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["n"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["Q"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["B"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["R"].resize((int(100*(self.size/95)),int(100*(self.size/95))))), ImageTk.PhotoImage(fenToImage["N"].resize((int(100*(self.size/95)),int(100*(self.size/95)))))]
         self.done = tk.BooleanVar(False)
@@ -190,7 +190,8 @@ class Board():
         self.parent.bind("<F11>", self.toggle_fullscreen)
         self.parent.bind("<F5>", lambda e: self.loadBoard(start))
         self.parent.bind("<F6>", self.restore_move)
-        self.parent.bind("<F7>", lambda e: print(self.movelog.keys(), "\n"))
+        if self.debug:
+            self.parent.bind("<F7>", lambda e: print(self.movelog.keys(), "\n"))
 
         self.fromFen(start)
         self.parent.after(500, self.refresh)
@@ -216,8 +217,9 @@ class Board():
         y0 = centreY - 260
         x1 = centreX + 300
         y1 = centreY + 260
-        self.canvas.create_rectangle(x0, y0, x1, y1, fill=self.boardColor1)
-        self.canvas.create_text(centreX, centreY+150, text=f"{'White' if self.currentPlayer else 'Black'} {self.win_text}", fill="black", font=('Calibri 25 bold'))
+        self.canvas.create_rectangle(x0, y0, x1, y1, fill=self.boardColor1, tags="win")
+        self.canvas.create_text(centreX, centreY+130, text=f"{'White' if self.currentPlayer else 'Black'} {self.win_text}", fill="black", font=('Calibri 25 bold'), tags="win")
+        self.canvas.create_image(centreX, centreY-70, image=self.win_image, tags="win")
 
     def on_draw(self):
         pass
@@ -232,39 +234,40 @@ class Board():
     def moveAI(self):
         self.canvas.unbind("<Button-1>")
         self.canvas.unbind("<B1-Motion>")
-
-        move = self.ai(["src\ChessAI", self.toFen()]).decode()
-        if self.debug:
-            print(move)
-        if "O-O" in move and "h8" in move:
-            move = "e8g8"
-        if "O-O" in move and "h1" in move:
-            move = "e1g1"
-        if "O-O-O" in move and "c8" in move:
-            move = "e8c8"
-        if "O-O-O" in move and "c1" in move:
-            move = "e1c1"
-        
-        oldPos = (8-int(move[1]), letterToColumn[move[0]])
-        newPos = (8-int(move[3]), letterToColumn[move[2]])
-
-        if "(promotion)" in move:
-            self.promotion_ai = True
-            self.placepiece(oldPos, newPos)
-            self.promote_pawn_ai(newPos, move[5])
-        self.selectedPiece = oldPos
         try:
-            self.moves = self.generateLegalMoves(oldPos[0], oldPos[1], self.board)
+            move = self.ai(["src\ChessAI", self.toFen()]).decode()
+            if self.debug:
+                print(move)
+            if "O-O" in move and "h8" in move:
+                move = "e8g8"
+            if "O-O" in move and "h1" in move:
+                move = "e1g1"
+            if "O-O-O" in move and "c8" in move:
+                move = "e8c8"
+            if "O-O-O" in move and "c1" in move:
+                move = "e1c1"
+            
+            oldPos = (8-int(move[1]), letterToColumn[move[0]])
+            newPos = (8-int(move[3]), letterToColumn[move[2]])
+
+            if "(promotion)" in move:
+                self.promotion_ai = True
+                self.placepiece(oldPos, newPos)
+                self.promote_pawn_ai(newPos, move[5])
+            self.selectedPiece = oldPos
+            try:
+                self.moves = self.generateLegalMoves(oldPos[0], oldPos[1], self.board)
+            except:
+                pass
+            if not newPos in self.moves:
+                self.moves.append(newPos)
+            if not self.promotion_ai:
+                self.placepiece(oldPos, newPos)
+            self.promotion_ai = False
+            self.moves = []
         except:
             pass
-        if not newPos in self.moves:
-            self.moves.append(newPos)
-        if not self.promotion_ai:
-            self.placepiece(oldPos, newPos)
-        self.promotion_ai = False
-        self.moves = []
         self.currentPlayer = int(not self.currentPlayer)
-
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
 
@@ -338,6 +341,7 @@ class Board():
         self.movelog[new_move_key] = eatenPiece
         
     def refresh(self):
+        #print(len(self.generateAllLegalMoves(self.board, self.currentPlayer)) == 0, self.currentPlayer, self.generateAllLegalMoves(self.board, self.currentPlayer))
         if len(self.generateAllLegalMoves(self.board, self.currentPlayer)) == 0 and self.in_check(self.board, self.currentPlayer):
             self.on_win()
         if self.useAI and self.currentPlayer != self.startPlayer and self.animations_done:
@@ -417,9 +421,10 @@ class Board():
         self.selectedPiece = ()
         self.movelog = {}
         self.move_log_r = ""
-        self.currentPlayer = WHITE
+        self.currentPlayer = self.startPlayer
 
         self.canvas.delete("piece")
+        self.canvas.delete("win")
         self.fromFen(fen)
 
 
@@ -429,6 +434,12 @@ class Board():
         row = 0
         col = 0
         spacePos = fen.find(" ")
+        if fen[spacePos+1] == "b":
+            if self.currentPlayer == -1:
+                self.currentPlayer = BLACK
+        else:
+            if self.currentPlayer == -1:
+                self.currentPlayer = WHITE
         for i in range(len(fen)):
             if fen[i] == "/":
                 row += 1
@@ -438,8 +449,6 @@ class Board():
             if fen[i] in fenToPiece and i < spacePos:
                 self.addpiece(self.createPiece(fen[i]), row, col)
                 col += 1
-            if fen[spacePos+1] == "b":
-                self.currentPlayer = BLACK 
             if fen[i] == "K" and i > spacePos:
                 self.whiteKingsideCastle = True
             if fen[i] == "Q" and i > spacePos:
@@ -453,8 +462,6 @@ class Board():
                 self.enpassant.append(self.board[(8-int(fen[i+1])+offset, letterToColumn[fen[i]])].uniqueCode)
         for key in self.board:
             self.drawpiece(self.board[key], key[0], key[1])
-        if self.useAI:
-            self.startPlayer = self.currentPlayer
         self.oldBoard = self.board.copy()
         self.canvas.tag_raise("piece")
         self.canvas.tag_lower("square")
@@ -486,7 +493,6 @@ class Board():
 
         try:
             for elem in self.enpassant:
-                print("Elem: ", elem)
                 fenStr += f"{columnToLetter[self.findPiece(elem)[0]]}{self.findPiece(elem)[1]+1}"
                 fenStr += " "
         except:
@@ -578,6 +584,7 @@ class Board():
         y0 = (oldPos[0] * self.size) + int(self.size/2) + self.offsetY
         x1 = (newPos[1] * self.size) + int(self.size/2) + self.offsetX
         y1 = (newPos[0] * self.size) + int(self.size/2) + self.offsetY
+        
         for i in range(self.animationFps+1):
             self.canvas.coords(self.board[newPos].uniqueCode, x0+((x1-x0)/self.animationFps)*i, y0+((y1-y0)/self.animationFps)*i)
             self.canvas.update()
@@ -771,8 +778,8 @@ class Board():
 
     def generateAllLegalMoves(self, board: dict, side_color: int):
         allMoves = []
-        moves = []
         for key in board:
+            moves = []
             if board[key].type == PAWN and board[key].color == side_color:
                 moves = self.pawnMoves(key[0], key[1], board)
             if board[key].type == KNIGHT and board[key].color == side_color:
@@ -789,6 +796,7 @@ class Board():
             for move in moves:
                 copy_board = board.copy()
                 copy_board[move] = copy_board[key]
+                copy_board.pop(key)
                 if not self.in_check(copy_board, side_color) and 0 < move[0] < 8 and 0 < move[1] < 8:
                     allMoves.append(move)
 
@@ -796,8 +804,9 @@ class Board():
     
     def generateAllPseudoMoves(self, board: dict, side_color: int):
         allMoves = []
-        moves = []
+
         for key in board:
+            moves = []
             if board[key].type == PAWN and board[key].color == side_color:
                 moves = self.pawnMoves(key[0], key[1], board)
             if board[key].type == KNIGHT and board[key].color == side_color:
@@ -808,6 +817,7 @@ class Board():
                 moves = self.rookMoves(key[0], key[1], board)
             if board[key].type == QUEEN and board[key].color == side_color:
                 moves = self.queenMoves(key[0], key[1], board)
+                
             if board[key].type == KING and board[key].color == side_color:
                 moves = self.kingMoves(key[0], key[1], board)
             
@@ -820,10 +830,11 @@ class Board():
         kingPos = ()
 
         for key in board:
-            if board[key].type == KING and board[key].color == self.currentPlayer:
+            if board[key].type == KING and board[key].color == color:
                 kingPos = key
 
         all_opponent_moves = self.generateAllPseudoMoves(board, int(not color))
+    
         if kingPos in all_opponent_moves:
             return True
         
@@ -1160,5 +1171,5 @@ class Board():
 
 
 if __name__ == "__main__":
-    board = Board(debug=True, ai=True, start="r1b4r/p1pp1p1p/7q/1p2b3/2k3P1/6PK/P6P/4n2R/ w") #start="r3kbnr/p1pp1ppp/b1n2q2/1p2p3/1P2P3/B1N2Q2/P1PP1PPP/R3KBNR/ w KQkq") #start="rnb1kbnr/ppqppp1p/8/8/2P5/3Q4/PP2PPPp/RNB1KBNR w KQkq c3 0 6")
+    board = Board(debug=True, ai=True, win_message="EDDU!!!", start_player=BLACK, win_img_path="C:\\Users\\Ilias\\Downloads\\win.png", start="rnbq1bnr/ppp1p1pp/3k4/3Q4/8/2N1P3/PPPP1PPP/R1B1KBNR/ b KQ") #start="r3kbnr/p1pp1ppp/b1n2q2/1p2p3/1P2P3/B1N2Q2/P1PP1PPP/R3KBNR/ w KQkq") #start="rnb1kbnr/ppqppp1p/8/8/2P5/3Q4/PP2PPPp/RNB1KBNR w KQkq c3 0 6")
     board.mainloop()

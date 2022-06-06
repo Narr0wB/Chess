@@ -86,8 +86,8 @@ int main(int argc, char* argv[]) {
 	Position p;
 	Position::set(argv[1], p);
 
-	std::cout << findBestMove<BLACK>(p, 4) << std::endl;
-	std::cout << mSCalls << std::endl;
+	p.getCurrentColor() == WHITE ? std::cout << findBestMove<WHITE>(p, 4) << std::endl : std::cout << findBestMove<BLACK>(p, 4) << std::endl;
+	std::cout << "Nodes searched: " << mSCalls << std::endl;
 	
 
 	/*while (1) {

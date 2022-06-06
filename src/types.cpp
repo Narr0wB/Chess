@@ -132,10 +132,15 @@ const char* MOVE_TYPESTR[16] = {
 	"N", "B", "R", "Q"
 };
 
+const char* MOVE_TYPESTR_B[16] = {
+	"", "", " O-O", " O-O-O", " N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)", " (capture)", "", " e.p.", "",
+	" N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)"
+};
+
 //Prints the move
 //For example: e5d6 (capture); a7a8R; O-O
 std::ostream& operator<<(std::ostream& os, const Move& m) {
-	os << SQSTR[m.from()] << SQSTR[m.to()] << MOVE_TYPESTR[m.flags()];
+	os << SQSTR[m.from()] << SQSTR[m.to()] << MOVE_TYPESTR_B[m.flags()];
 	return os;
 }
 
