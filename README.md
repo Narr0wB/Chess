@@ -37,7 +37,7 @@ board.mainloop()
  - F6 - Undo the last move
  - F7 - If debug is enabled. print to stdout the move log, e.g:
  
- "{move index} {move} {if its an enpassant, position of the capured pawn} {player who made the move} {if enpassant}" --->
+ "{move index} {move} {if its an enpassant, position of the captured pawn} {player who made the move} {if enpassant}" --->
  "5 c5d6 d5 player: WHITE enpassant: TRUE" or "4 d7d5 player: BLACK enpassant: FALSE"
  - F8 - If debug is enabled, print to stdout the fen representation of the current board
  - F11 - Toggle fullscreen
