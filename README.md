@@ -5,7 +5,7 @@ This is a chess application written in python and a chess engine written in C++.
 In order to use the application, you will need the tkinter and pillow modules that can be easily installed through the python package manager.
 
 ```bash
-$ pip install tkinter
+$ pip install tk
 ...
 $ pip install pillow
 ```
