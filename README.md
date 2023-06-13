@@ -1,6 +1,8 @@
 # Narrow's chess engine
 This is a chess application written in python and a chess engine written in C++.
 
+![](https://github.com/Narr0wB/Chess/blob/main/Chess/assets/chess.gif)
+
 ## Installation
 In order to use the application, you will need the tkinter and pillow modules that can be easily installed through the python package manager.
 
