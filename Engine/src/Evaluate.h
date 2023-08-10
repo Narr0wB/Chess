@@ -1,10 +1,14 @@
 
+#ifndef EVALUATE_H
+#define EVALUATE_H
+
 #include <iostream>
 #include "position.h"
 #include "types.h"
 #include "Utils.h"
 
 #define INFINITY 2000000000
+using namespace std::chrono_literals;
 
 const int black_pawn_table[64] = {  0,  0,  0,  0,  0,  0,  0,  0,
                                    50, 50, 50, 50, 50, 50, 50, 50,
@@ -136,6 +140,7 @@ int imbalance_t(Piece& square, Piece* pieces);
 int middle_game_eval(Position& b);
 
 static int mSCalls = 0;
+static std::chrono::system_clock::time_point start_time;
 template<Color color>
 int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
     ++mSCalls;
@@ -144,6 +149,10 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
         return Evaluate(board);
     }
 
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > 15 * 1000ms) {
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count();
+        return Evaluate(board);
+    }
 
     depth -= 1;
     if (color == WHITE) {
@@ -194,6 +203,7 @@ Move findBestMove(Position& board, int depth) {
 
 
     MoveList<color> mL(board);
+    start_time = std::chrono::system_clock::now();
 
     for (Move m : mL) {
         board.play<color>(m);
@@ -213,3 +223,5 @@ Move findBestMove(Position& board, int depth) {
 
     return bestMove;
 }
+
+#endif // EVALUATE_H

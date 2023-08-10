@@ -82,7 +82,7 @@ inline Square& operator+=(Square& s, Direction d) { return s = s + d; }
 inline Square& operator-=(Square& s, Direction d) { return s = s - d; }
 
 enum File : int {
-	AFILE, BFILE, CFILE, DFILE, EFILE, FFILE, GFILE, HFILE
+	AFILE, BFILE, CFILE, DFILE, EFILE, FFILE, GFILE, HHFILE
 };	
 
 enum Rank : int {
@@ -123,10 +123,10 @@ template<Direction D>
 constexpr Bitboard shift(Bitboard b) {
 	return D == NORTH ? b << 8 : D == SOUTH ? b >> 8
 		: D == NORTH + NORTH ? b << 16 : D == SOUTH + SOUTH ? b >> 16
-		: D == EAST ? (b & ~MASK_FILE[HFILE]) << 1 : D == WEST ? (b & ~MASK_FILE[AFILE]) >> 1
-		: D == NORTH_EAST ? (b & ~MASK_FILE[HFILE]) << 9 
+		: D == EAST ? (b & ~MASK_FILE[HHFILE]) << 1 : D == WEST ? (b & ~MASK_FILE[AFILE]) >> 1
+		: D == NORTH_EAST ? (b & ~MASK_FILE[HHFILE]) << 9 
 		: D == NORTH_WEST ? (b & ~MASK_FILE[AFILE]) << 7
-		: D == SOUTH_EAST ? (b & ~MASK_FILE[HFILE]) >> 7 
+		: D == SOUTH_EAST ? (b & ~MASK_FILE[HHFILE]) >> 7 
 		: D == SOUTH_WEST ? (b & ~MASK_FILE[AFILE]) >> 9
 		: 0;	
 }
@@ -183,7 +183,9 @@ public:
 	inline Square to() const { return Square(move & 0x3f); }
 	inline Square from() const { return Square((move >> 6) & 0x3f); }
 	inline int to_from() const { return move & 0xffff; }
+	inline uint16_t to_from_flags() const { return move; }
 	inline MoveFlags flags() const { return MoveFlags((move >> 12) & 0xf); }
+	static std::string toString(Move& move);
 
 	inline bool is_capture() const {
 		return (move >> 12) & CAPTURES;

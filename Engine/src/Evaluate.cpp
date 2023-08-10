@@ -5,10 +5,10 @@ int Evaluate(Position& evaluateBoard) {
     int score = 0;
     Piece* pieces = evaluateBoard.getPieces();
     if (MoveList<WHITE>(evaluateBoard).size() == 0) {
-        return -10000;
+        return -20000;
     }
     if (MoveList<BLACK>(evaluateBoard).size() == 0) {
-        return 10000;
+        return 20000;
     }
     for (uint8_t i = 0; i < NSQUARES; i++) {
         switch (pieces[i])
@@ -36,8 +36,10 @@ int Evaluate(Position& evaluateBoard) {
             score += white_queen_table[i];
             break; 
         case WHITE_KING:
-            score += 20000;
-            score += white_king_mg_table[i]; 
+            if (evaluateBoard.ply() > 30)
+                score += white_king_mg_table[i];
+            if (evaluateBoard.ply() > 50)
+                score += white_king_eg_table[i];
             break;
         case BLACK_PAWN:
             score -= 100;
@@ -60,8 +62,10 @@ int Evaluate(Position& evaluateBoard) {
             score -= black_queen_table[i];
             break; 
         case BLACK_KING:
-            score -= 20000;
-            score -= black_king_mg_table[i];
+            if (evaluateBoard.ply() > 30)
+                score -= black_king_mg_table[i];
+            if (evaluateBoard.ply() > 50)
+                score -= black_king_eg_table[i];
             break;
         }
     }

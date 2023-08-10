@@ -139,8 +139,8 @@ void initialise_rook_attacks() {
 	Bitboard edges, subset, index;
 
 	for (Square sq = a1; sq <= h8; ++sq) {
-		edges = ((MASK_RANK[AFILE] | MASK_RANK[HFILE]) & ~MASK_RANK[rank_of(sq)]) |
-			((MASK_FILE[AFILE] | MASK_FILE[HFILE]) & ~MASK_FILE[file_of(sq)]);
+		edges = ((MASK_RANK[AFILE] | MASK_RANK[HHFILE]) & ~MASK_RANK[rank_of(sq)]) |
+			((MASK_FILE[AFILE] | MASK_FILE[HHFILE]) & ~MASK_FILE[file_of(sq)]);
 		ROOK_ATTACK_MASKS[sq] = (MASK_RANK[rank_of(sq)]
 			^ MASK_FILE[file_of(sq)]) & ~edges;
 		ROOK_ATTACK_SHIFTS[sq] = 64 - pop_count(ROOK_ATTACK_MASKS[sq]);
@@ -205,8 +205,8 @@ void initialise_bishop_attacks() {
 	Bitboard edges, subset, index;
 
 	for (Square sq = a1; sq <= h8; ++sq) {
-		edges = ((MASK_RANK[AFILE] | MASK_RANK[HFILE]) & ~MASK_RANK[rank_of(sq)]) |
-			((MASK_FILE[AFILE] | MASK_FILE[HFILE]) & ~MASK_FILE[file_of(sq)]);
+		edges = ((MASK_RANK[AFILE] | MASK_RANK[HHFILE]) & ~MASK_RANK[rank_of(sq)]) |
+			((MASK_FILE[AFILE] | MASK_FILE[HHFILE]) & ~MASK_FILE[file_of(sq)]);
 		BISHOP_ATTACK_MASKS[sq] = (MASK_DIAGONAL[diagonal_of(sq)]
 			^ MASK_ANTI_DIAGONAL[anti_diagonal_of(sq)]) & ~edges;
 		BISHOP_ATTACK_SHIFTS[sq] = 64 - pop_count(BISHOP_ATTACK_MASKS[sq]);

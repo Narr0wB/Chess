@@ -123,4 +123,25 @@ void Position::move_piece_quiet(Square from, Square to) {
 	board[from] = NO_PIECE;
 }
 
+void Position::reset()
+{
+	game_ply = 0;
+	hash = 0;
+	side_to_play = WHITE;
+	pinned = 0;
+	checkers = 0;
+
+	for (int i = 0; i < NPIECES; ++i) {
+		piece_bb[i] = 0;
+	}
+
+	for (int i = 0; i < NSQUARES; ++i) {
+		board[i] = NO_PIECE;
+	}
+
+	for (int i = 0; i < 256; ++i) {
+		history[i] = UndoInfo();
+	}
+}
+
 

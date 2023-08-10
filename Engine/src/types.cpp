@@ -144,3 +144,7 @@ std::ostream& operator<<(std::ostream& os, const Move& m) {
 	return os;
 }
 
+std::string Move::toString(Move& move) { 
+	return std::string(SQSTR[move.from()]) + std::string(SQSTR[move.to()]) + std::string(MOVE_TYPESTR_B[move.flags()]); 
+}
+
