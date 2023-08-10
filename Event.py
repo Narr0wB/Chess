@@ -7,6 +7,7 @@ MOUSE_RELEASED_EVENT = 2
 KEYBOARD_PRESSED_EVENT = 3
 KEYBOARD_RELEASED_EVENT = 4
 ENGINE_MOVE_EVENT = 5
+UPDATE_LOG_EVENT = 6
 
 class Event:
     def __init__(self):
@@ -49,6 +50,12 @@ class EngineMoveEvent(Event):
     def __init__(self, move_code = 0):
         self.type = ENGINE_MOVE_EVENT
         self.move_code = move_code
+
+class UpdateLogEvent(Event):
+    def __init__(self, move, ply = 0):
+        self.type = UPDATE_LOG_EVENT
+        self.move = move
+        self.ply = ply
 
 class MousePressedEvent(Event):
     def __init__(self, x, y, button = 1):
