@@ -21,7 +21,7 @@
 	EXIT										---> Exit the program
 */
 
-int main(int argc, char* argv[]) {
+int main(void) {
 	initialise_all_databases();
 	zobrist::initialise_zobrist_keys();
 

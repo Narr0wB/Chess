@@ -52,10 +52,12 @@ class EngineMoveEvent(Event):
         self.move_code = move_code
 
 class UpdateLogEvent(Event):
-    def __init__(self, move, ply = 0):
+    def __init__(self, fen_type, move, ply = 0, restore: bool = False):
         self.type = UPDATE_LOG_EVENT
         self.move = move
         self.ply = ply
+        self.fen_type = fen_type
+        self.restore = restore
 
 class MousePressedEvent(Event):
     def __init__(self, x, y, button = 1):

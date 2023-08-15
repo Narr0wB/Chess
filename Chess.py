@@ -4,32 +4,24 @@ import time
 import random
 import tkinter as tk
 import time
-import platform
 import os
 from math import *
-import math
 import atexit
 
 from Event import *
+from Utilities import *
 from pygame import mixer
-from tkinter import font
 
-import win32pipe, win32file, pywintypes
+import win32file, pywintypes
 from PIL import Image, ImageTk
 from PIL.Image import Resampling
 
-my_system = platform.uname()
-
 from ctypes import windll
 windll.shcore.SetProcessDpiAwareness(1)
-
-CHESS_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+mixer.init()
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-TIMEFL = 0.00000000150 if my_system.node.lower().find("desktop") == -1 else 0.000150
-
-mixer.init()
-mixer.music.load(f"{dir_path}\\assets\\move-self.mp3")
+CHESS_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
 
 # BUGGED POSITION: 2kr1bnr/ppp1pppp/4b3/8/1nP2B2/N7/PPK1PPPP/R4BNR w - - 0 1
 
@@ -52,7 +44,8 @@ UNDO = 0x03
 MOVEREQ = 0x04
 GENMOVES = 0x05
 INCHECK = 0x06
-EXIT = 0x07
+FEN = 0x07
+EXIT = 0x08
 
 # -------------------------------------------------------------------------------
 SQSTR = {
@@ -71,6 +64,10 @@ MOVE_TYPESTR_B = [
 	"", "", " O-O", " O-O-O", " N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)", " (capture)", "", " e.p.", "",
 	" N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)"
 ];
+
+MOVE_FLAGSTR = [
+    "", "", "OO", "OOO", "", "", "", "", "x", "", "ep", "", "", "", "", ""
+]
 
 # -------------------------------------------------------------------------------
 QUIET = 0b0000
@@ -91,10 +88,9 @@ PC_BISHOP = 0b1101
 PC_ROOK = 0b1110
 PC_QUEEN = 0b1111
 
-# -------------------------------------------------------------------------------
-HUMAN = 0x01
-AI = 0x02
 NOMOVE = 0xFF
+
+# -------------------------------------------------------------------------------
 
 pieceToFen = {
     (KING, BLACK) : "k",
@@ -160,6 +156,33 @@ def flagToType(flag: int) -> int:
         return ROOK
     if flag == PR_QUEEN or flag == PC_QUEEN:
         return QUEEN
+    
+def typeToFlag(type: int, capture: bool) -> int:
+    if type == KNIGHT:
+        if capture:
+            return PC_KNIGHT
+        else:
+            return PR_KNIGHT
+    
+    if type == BISHOP:
+        if capture:
+            return PC_BISHOP
+        else:
+            return PR_BISHOP
+        
+    if type == ROOK:
+        if capture:
+            return PC_ROOK
+        else:
+            return PR_ROOK
+        
+    if type == QUEEN:
+        if capture:
+            return PC_QUEEN
+        else:
+            return PR_QUEEN
+        
+    return -1
 
 class Piece:
     def __init__(self, pieceType: int, color: int, image: ImageTk.PhotoImage):
@@ -184,6 +207,10 @@ class Move:
     
     def getFlags(self):
         return self.move >> 12
+    
+    def setFlags(self, flags: int):
+        self.move &= (0b111111 << 6 | 0b111111)
+        self.move |= (flags << 12)
     
     def toBytes(self):
         return self.move.to_bytes(2, "little")
@@ -246,58 +273,10 @@ def sort_keys(keys: list, crescente: bool = False) -> list:
     
     return sorted_list
 
-def dist(p1: tuple, p2: tuple) -> float:
-    return math.sqrt(math.pow(p1[0] - p2[0], 2)+ math.pow(p1[1] - p2[1], 2))
-
-def alpha_blend(color_dict: dict) -> str:
-    colors = sorted(color_dict.items())
-    w_sum = sum(color_dict.values())
-
-    # Weighted Average between the different colors' rgb values
-
-    red = int(sum(int(x.replace("#", "")[:2], 16)*w for x, w in colors)/w_sum)
-    green = int(sum(int(x.replace("#", "")[2:4], 16)*w for x, w in colors)/w_sum)
-    blue = int(sum(int(x.replace("#", "")[4:6], 16)*w for x, w in colors)/w_sum)
-
-    # Output the final color
-
-    return "#" + f"{red:x}" + f"{green:x}" + f"{blue:x}"
-
-class RoundRectangle():
-    def __init__(self, canvas: tk.Canvas, x1, y1, x2, y2, radius = 20, **kwargs):
-        self.rect_x1 = x1
-        self.rect_y1 = y1
-        self.rect_x2 = x2
-        self.rect_y2 = y2
-
-        self.circle_radius = radius
-        self.canvas = canvas
-
-        offset = floor(radius/2)
-
-        rect_points = [
-            x1, y1 + offset,
-            x1 + offset, y1,
-            x2 - offset, y1,
-            x2, y1 + offset,
-            x2, y2 - offset,
-            x2 - offset, y2,
-            x1 + offset, y2,
-            x1, y2 - offset
-        ]
-
-        self.rectangle = canvas.create_polygon(rect_points, **kwargs)
-        self.circles = [
-            canvas.create_oval(x1, y1, x1 + self.circle_radius, y1 + self.circle_radius, outline="", **kwargs),
-            canvas.create_oval(x2 - 1, y1, x2 - self.circle_radius, y1 + self.circle_radius, outline="", **kwargs),
-            canvas.create_oval(x2 - 1, y2 - 1, x2 - self.circle_radius, y2 - self.circle_radius, outline="", **kwargs),
-            canvas.create_oval(x1, y2 - 1, x1 + self.circle_radius, y2 - self.circle_radius, outline="", **kwargs),
-        ]
-
 
 
 class Board():
-    def __init__(self, debug=False, tileSize=110, colorLight="#F1D9C2", colorDark="#AB7966", start: str = CHESS_START, ai: bool = False, win_message: str = "won", win_img_path: str = f"{dir_path}\\assets\\chess_win.png", start_player: int = -1, ):
+    def __init__(self, debug=False, tileSize=105, colorLight="#F1D9C2", colorDark="#AB7966", start: str = CHESS_START, ai: bool = False, start_player: int = -1):
         self.debug = debug
 
         self.parent = tk.Tk()
@@ -328,7 +307,7 @@ class Board():
         "P" : ImageTk.PhotoImage(Image.open(f"{dir_path}\\assets\\wpawn.png").resize((int(self.piece_scale * self.size),int(self.piece_scale * self.size)), Resampling.LANCZOS)),
         }
 
-        self.current_player = start_player
+        
         self.selected_piece = ()
         self.enpassant = []
         self.moves = []
@@ -337,18 +316,14 @@ class Board():
         self.ai_level = 4
         self.engine_handle = 0
         self.game_ply = 0
-        self.start_player = start_player if start_player != -1 else WHITE if start[start.find(" ")+1] == "w" else BLACK
+        self.start_player = WHITE
+        self.current_player = self.start_player
 
         self.board = {}
-        self.old_board = {}
         self.move_log = []
-        self.move_log_label = tk.Label()
-        self.win_text = win_message if len(win_message) < 20 else "won"
-        self.win_image = ImageTk.PhotoImage(Image.open(win_img_path).resize((500, 350), Resampling.LANCZOS))
-        self.draw_image = ImageTk.PhotoImage(Image.open(f"{dir_path}\\assets\\chess_draw.png").resize((500, 350), Resampling.LANCZOS))
 
         self.auziliary_pieces = [self.fenToImage["q"], self.fenToImage["b"], self.fenToImage["r"], self.fenToImage["n"], self.fenToImage["Q"], self.fenToImage["B"], self.fenToImage["R"], self.fenToImage["N"]]
-        self.promotion_ui = tk.BooleanVar(self.parent)
+        self.promotion_ui = False
         self.animations_done = True
 
         canvas_width = self.columns * self.size
@@ -372,13 +347,12 @@ class Board():
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
-        self.parent.bind("<F11>", self.toggle_fullscreen)
         self.parent.bind("<F5>", lambda e: self.loadBoard(start))
         self.parent.bind("<F6>", self.restoreMove)
+        self.canvas.bind("<<restore>>", self._restoreMove)
 
         self.parent.protocol("WM_DELETE_WINDOW", self.onClose)
         if self.debug:
-            self.parent.bind("<F7>", self.print_move_log)
             self.parent.bind("<F8>", lambda e: print(self.toFen()))
 
         atexit.register(self.engineSendCommand, EXIT)
@@ -389,7 +363,7 @@ class Board():
 
         self.gui_font = "Noto Sans Medium"
         self.gui = {"offx": 0, "offy": 0, "width": 0, "height": 0}
-        self._control_variables = {"engine_calculating": False}
+        self._control_variables = {"engine_calculating": False, "movelog_count": 2, "movelog_list": [], "drag_calls": 0, "restore": False, "promotion_sq": None}
         
         
         self.loading_animation = []
@@ -409,10 +383,12 @@ class Board():
         self.should_close = True
 
     def initializeEngine(self):
-        #subprocess.Popen([f"{dir_path}\\src\ChessEngine"])
+        #subprocess.Popen([f"{dir_path}\\assets\\Engine.exe"])
+        time.sleep(0.1)
+
         try:
             # Create the pipe for communication
-            self.engine_handle = win32file.CreateFile(r"\\.\\pipe\\chs", 
+            self.engine_handle = win32file.CreateFile(r"\\.\\pipe\\chess", 
                                                     win32file.GENERIC_READ | win32file.GENERIC_WRITE,
                                                     0,
                                                     None,
@@ -435,12 +411,14 @@ class Board():
         _, _ = win32file.WriteFile(self.engine_handle, command_type.to_bytes(1) + command_payload) 
 
         if self.debug:
-            print("Sent the engine", command_type, command_payload)
+            pass
+            #print("Sent the engine", command_type, command_payload)
 
         if wait:
             res = win32file.ReadFile(self.engine_handle, 1024)
             if self.debug:
-                print("Received from the engine", res[1])
+                pass
+                #print("Received from the engine", res[1])
 
             return res[1]
 
@@ -448,22 +426,60 @@ class Board():
 
     def mainloop(self):
         while not self.should_close:
+            time.sleep(1/self.application_fps)
             self.handler.pollEvents()            
 
             self.parent.update()
             self.parent.update_idletasks()
     
     def updateMoveLog(self, event: UpdateLogEvent):
-        top_offset = self.gui["offy"] +int(self.gui["height"] * 0.12)
-        side_offset = self.gui["offx"] + int(self.gui["width"] * 0.05)
+        top_offset = self.gui["offy"] +int(self.gui["height"] * 0.15)
+        side_offset = self.gui["offx"] + int(self.gui["width"] * 0.06)
         element_offset = int(self.gui["height"] * 0.05)
 
-        animation_frames = 10
+        animation_frames = 100
 
-        new_label = self.canvas.create_text(side_offset, top_offset, font=(self.gui_font, 12), text=f"{event.ply}. {Move(event.move).__str__()[2:]}", tags=(f"ml{event.ply}",))
+        if event.restore:
+            gui_move_element: GuiMoveElement = self._control_variables["movelog_list"][-1]
+            self._control_variables["movelog_count"] -= (-1 if self._control_variables["movelog_count"] == 1 else 1)
 
-        for i in range(event.ply if event.ply < 10 else 9):
-            self._moveItem(f"ml{i}", side_offset, top_offset + i*element_offset, side_offset, top_offset + (i+1)*element_offset, animation_frames)
+            if (self.current_player != self.start_player):
+                gui_move_element.updateBlack("") if self.start_player == WHITE else gui_move_element.updateWhite("")
+            else:
+                self._control_variables["movelog_list"].pop(-1)
+                self.canvas.delete(gui_move_element.getId())
+                self._moveItem(f"move_log", 0, -element_offset, animation_frames)
+
+                if (len(self._control_variables["movelog_list"]) > 9):
+                    self._control_variables["movelog_list"][-10].draw(side_offset, top_offset + 9*element_offset)
+
+            if self._control_variables["restore"]:
+                self._control_variables["restore"] = False
+                self.canvas.event_generate("<<restore>>", when="tail")
+            else:
+                self.parent.bind("<F6>", self.restoreMove)
+
+            return
+        
+        if (self._control_variables["movelog_count"] == 2):
+            self._control_variables["movelog_count"] = 0
+
+            if (len(self._control_variables["movelog_list"]) > 9):
+                self.canvas.delete(self._control_variables["movelog_list"][-10].getId())
+
+            self._moveItem(f"move_log", 0, element_offset, animation_frames)
+
+            self._control_variables["movelog_list"].append(GuiMoveElement(self.canvas, side_offset, top_offset, int(self.gui["width"] * 0.35), int(self.gui["height"] * 0.04), int((event.ply + 1)/2), "", "", fill="#21201E"))   
+        self._control_variables["movelog_count"] += 1
+
+        if (self.current_player == WHITE):
+            self._control_variables["movelog_list"][-1].updateBlack(((event.fen_type if (event.move.getFlags() != OOO and event.move.getFlags() != OO) else "") + MOVE_FLAGSTR[event.move.getFlags()]) + event.move.__str__()[2:4])
+        else:
+            self._control_variables["movelog_list"][-1].updateWhite(((event.fen_type if (event.move.getFlags() != OOO and event.move.getFlags() != OO) else "") + MOVE_FLAGSTR[event.move.getFlags()]) + event.move.__str__()[2:4])
+
+        
+
+        #print(f"it took {end-start}s")
 
     def createPiece(self, square: int, piece_type: int, piece_color: int): 
         piece = Piece(piece_type, piece_color, self.fenToImage[pieceToFen[piece_type, piece_color]])
@@ -480,49 +496,6 @@ class Board():
 
         piece.uniqueCode = f"pc{uC}"
         self.board[square] = piece
-
-    def print_move_log(self, event):
-        os.system("cls")
-        sorted_key_list = sort_keys(self.move_log.keys(), True)
-        for element in sorted_key_list:
-            print(element[:len(element)-3] + "player: " + ("BLACK" if int(element[len(element)-3]) else "WHITE") + " enpassant: " + ("TRUE" if int(element[len(element)-1]) else "FALSE"))
-
-    def reload(self, event):
-        self.parent.update()
-        self.window_width = self.parent.winfo_width()
-        self.window_height = self.parent.winfo_height()
-        self.offset_x = (self.window_width - (self.size*8)) // 2
-        self.offset_y= (self.window_height - (self.size*8)) // 2
-        self.canvas.delete("all")
-        self.drawBoard()
-        for key in self.board:
-            self.drawPiece(self.board[key], key[0], key[1])
-    
-    def on_win(self):
-        centreX = self.parent.winfo_width() // 2
-        centreY = self.parent.winfo_height() // 2
-        x0 = centreX - 300
-        y0 = centreY - 260
-        x1 = centreX + 300
-        y1 = centreY + 260
-        self.canvas.create_rectangle(x0, y0, x1, y1, fill=self.board_color_light, tags="win")
-        self.canvas.create_text(centreX, centreY+130, text=f"{'White' if self.current_player else 'Black'} {self.win_text}", fill="black", font=('Calibri 25 bold'), tags="win")
-        self.canvas.create_image(centreX, centreY-70, image=self.win_image, tags="win")
-
-    def on_draw(self):
-        centreX = self.parent.winfo_width() // 2
-        centreY = self.parent.winfo_height() // 2
-        x0 = centreX - 300
-        y0 = centreY - 260
-        x1 = centreX + 300
-        y1 = centreY + 260
-        self.canvas.create_rectangle(x0, y0, x1, y1, fill=self.board_color_light, tags="draw")
-        self.canvas.create_text(centreX, centreY+130, text=f"Draw!", fill="black", font=('Calibri 25 bold'), tags="draw")
-        self.canvas.create_image(centreX, centreY-70, image=self.draw_image, tags="draw")
-    
-    def toggle_fullscreen(self, event):
-        self.fullscreen = not self.fullscreen
-        self.parent.attributes("-fullscreen", self.fullscreen)
 
     def requestAIMove(self):
         self.canvas.unbind("<Button-1>")
@@ -557,38 +530,44 @@ class Board():
     def moveAIThread(self, handler: Handler, engine_pipe_handle):
         res = win32file.ReadFile(engine_pipe_handle, 1024)
 
-        if self.debug:
-            print("Received: ", res[1])
-
         handler.queuePush(EngineMoveEvent(res[1]))
 
     def moveAI(self, event: EngineMoveEvent):
         self._control_variables["engine_calculating"] = False
 
-        try:
-            move_code = event.move_code
-            move = Move(int.from_bytes(move_code, "little"))
+        
+        move_code = event.move_code
+        move = Move(int.from_bytes(move_code, "little"))
 
-            if self.debug:
-                print("The engine played", move)
+        if self.debug:
+            print("The engine played", move)
 
-            self.playMove(move, AI)
-        except:
-            pass
+        self.playMove(move)
 
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
 
-        
-
     def restoreMove(self, event):
-        if len(self.move_log) == 0 or self.promotion_ui.get():
+        self.parent.unbind("<F6>")
+        self.canvas.event_generate("<<restore>>", when="tail")
+
+        if self.use_ai:
+            self._control_variables["restore"] = True
+
+    def _restoreMove(self, event):
+        if len(self.move_log) == 0 or self.promotion_ui or self._control_variables["engine_calculating"]:
+            self.parent.bind("<F6>", self.restoreMove)
             return
+        
+        if (self.selected_piece != None):
+            self.resetSelectedMovesColor([move.getTo() for move in self.moves])
+            self.resetSelectedColor()
 
         self.engineSendCommand(UNDO)
         self.current_player ^= 1
+        
 
-        last_move, last_move_capture = self.move_log.pop(self.game_ply)
+        last_move, last_move_capture = self.move_log.pop(-1)
 
         from_sq = last_move.getFrom()
         to_sq = last_move.getTo()
@@ -608,7 +587,7 @@ class Board():
             self.board[to_sq] = last_move_capture
             self.drawPiece(last_move_capture, to_sq)
         
-        if flags >= PR_KNIGHT:
+        if flags >= PR_KNIGHT and flags != CAPTURE:
             self.canvas.delete(self.board[from_sq].uniqueCode)
             self.createPiece(from_sq, PAWN, self.current_player)
             self.drawPiece(self.board[from_sq], from_sq)
@@ -624,6 +603,11 @@ class Board():
                 self.movePiece(SQSTR["d8"], SQSTR["a8"])
             else:
                 self.movePiece(SQSTR["d1"], SQSTR["a1"])
+
+        self.game_ply -= 1
+ 
+        self.handler.queuePush(UpdateLogEvent(None, None, self.game_ply, True))
+        
 
     def findPiece(self, uniqueCode: str):
         for key in self.board:
@@ -667,7 +651,7 @@ class Board():
             self.drawPiece(piece, sq)
    
 
-        if self.promotion_ui.get():
+        if self.promotion_ui:
             self.showPromotionUI()
 
         self.canvas.tag_lower("square")
@@ -675,7 +659,6 @@ class Board():
         
     def loadBoard(self, fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq"):
         self.board.clear()
-        self.old_board.clear()
         self.moves.clear()
         self.enpassant.clear()
         self.selected_piece = None
@@ -700,8 +683,10 @@ class Board():
 
         spacePos = fen.find(" ")
         if fen[spacePos+1] == "b":
+            self.start_player = BLACK
             self.current_player = BLACK
         else:
+            self.start_player = WHITE
             self.current_player = WHITE
 
         square = 56
@@ -713,55 +698,12 @@ class Board():
             elif fen[i] in fenToPiece and i < spacePos:
                 self.createPiece(square, fenToPiece[fen[i]][0], fenToPiece[fen[i]][1])
                 square += 1
-            # if fen[i] == "K" and i > spacePos:
-            #     self.white_kingside_castle = True
-            # if fen[i] == "Q" and i > spacePos:
-            #     self.white_queenside_castle = True
-            # if fen[i] == "k" and i > spacePos:
-            #     self.black_kingside_castle = True
-            # if fen[i] == "q" and i > spacePos:
-            #     self.black_queenside_castle = True
-            # if i > spacePos + 2 and fen[i] in letterToColumn:
-            #     offset = 1 if int(fen[i+1]) == 6 else -1
-            #     self.enpassant.append(self.board[(8-int(fen[i+1])+offset, letterToColumn[fen[i]])].uniqueCode)
-        # for key in self.board:
-        #     self.drawPiece(self.board[key], key[0], key[1])
-        # self.old_board = self.board.copy()
-        # self.canvas.tag_raise("piece")
-        # self.canvas.tag_lower("square")
 
     # Current board to FEN notation
     def toFen(self):
-        fenStr = ""
-        spaces = 0
-        for row in range(8):
-            for col in range(8):
-                if (row, col) in self.board:
-                    fenStr += f"{spaces if spaces > 0 else ''}{self.board[(row, col)].fentype}"
-                    spaces = 0
-                else:
-                    spaces += 1
-            fenStr += f"{spaces if spaces > 0 else ''}/"
-            spaces = 0
-        fenStr += " b" if self.current_player else " w"
-        fenStr += " "
-        if self.white_kingside_castle:
-            fenStr += "K"
-        if self.white_queenside_castle:
-            fenStr += "Q"
-        if self.black_kingside_castle:
-            fenStr += "k"
-        if self.black_queenside_castle:
-            fenStr += "q"
-        fenStr += " "
+        fen_str = self.engineSendCommand(FEN)
 
-        try:
-            for elem in self.enpassant:
-                fenStr += f"{columnToLetter[self.findPiece(elem)[0]]}{self.findPiece(elem)[1]+1}"
-                fenStr += " "
-        except:
-            pass
-        return fenStr
+        return fen_str.decode()
 
     # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
     def addpiece(self, piece: Piece, row: int, column: int):
@@ -780,12 +722,11 @@ class Board():
 
         self.canvas.create_image(x0, y0, image=piece.image, tags=(piece.uniqueCode, "piece"), anchor=tk.CENTER)
 
-    def _moveItem(self, id_or_tag, x0, y0, x1, y1, frames):
+    def _moveItem(self, id_or_tag, dx, dy, frames):
         for i in range(frames):
-            self.canvas.coords(id_or_tag, x0 + ((x1 - x0)/float(frames)) * (i), y0 + ((y1 - y0)/float(frames)) * (i))
+            self.canvas.move(id_or_tag, dx/float(frames), dy/float(frames))
             self.canvas.update()
 
-        self.canvas.coords(id_or_tag, x1, y1)
 
     def movePiece(self, from_sq: int, to_sq: int):
         self.board[to_sq] = self.board.pop(from_sq)
@@ -795,32 +736,31 @@ class Board():
         x1 = ((to_sq % 8) * self.size) + int(self.size/2) + self.offset_x
         y1 = ((7 - (to_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
 
-        distance = dist((x0, y0), (x1, y1))
-        frames = 240
+        frame_time = int(self.application_fps/2)
         
-        self._moveItem(self.board[to_sq].uniqueCode, x0, y0, x1, y1, frames)
+        self._moveItem(self.board[to_sq].uniqueCode, x1 - x0, y1 - y0, frame_time)
     
 
     # Given an old position and a new one, place the piece in oldPos in newPos
-    def playMove(self, move: Move, player: int, move_piece: int = MOVE, sound: bool = True):
+    def playMove(self, move: Move, move_piece: int = MOVE, sound: bool = True):
 
         # TODO 1: add images of the eaten piece under or over the 
         
-        self.engineSendCommand(MOVE, self.current_player.to_bytes(1) + move.toBytes())
-
         from_sq = move.getFrom()
         to_sq = move.getTo()
         flags = move.getFlags()
-
+        
         self.game_ply += 1
 
         if flags == OO:
+            self.move_log.append((move, None))
             if self.current_player == BLACK:
                 self.movePiece(SQSTR["h8"], SQSTR["f8"])
             else:
                 self.movePiece(SQSTR["h1"], SQSTR["f1"])
 
         if flags == OOO:
+            self.move_log.append((move, None))
             if self.current_player == BLACK:
                 self.movePiece(SQSTR["a8"], SQSTR["d8"])
             else:
@@ -839,34 +779,38 @@ class Board():
             captured_piece = self.board.pop(to_sq)
             self.move_log.append((move, captured_piece))
             self.canvas.delete(captured_piece.uniqueCode)
+        
+        if flags == QUIET or flags == DOUBLE_PUSH or (flags >= PR_KNIGHT and flags < PC_KNIGHT and flags != CAPTURE and flags != EN_PASSANT):
+            self.move_log.append((move, None))
 
         if move_piece == MOVE:
             self.movePiece(from_sq, to_sq)
         else:
             self.board[to_sq] = self.board.pop(from_sq)
+            x1 = ((to_sq % 8) * self.size) + int(self.size/2) + self.offset_x
+            y1 = ((7 - (to_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
+            self.canvas.coords(self.board[to_sq].uniqueCode, x1, y1)
+
+        if flags >= PR_KNIGHT and flags != CAPTURE and flags != EN_PASSANT:
+            self.promotePawn(to_sq, self.current_player, flagToType(flags))
 
         if sound:
-            if flags == CAPTURE:
+            if flags == CAPTURE or flags >= PC_KNIGHT:
                 mixer.music.load(f"{dir_path}\\assets\\capture.mp3")
                 mixer.music.play()
             else:
                 mixer.music.load(f"{dir_path}\\assets\\move-self.mp3")
-                mixer.music.play()
+                mixer.music.play() 
 
-        if flags >= PR_KNIGHT and flags != CAPTURE:
-            if player == AI:
-                self.promotePawn(to_sq, self.current_player, flagToType(flags))
-            if player == HUMAN:
-                self.showPromotionUI()
+        self.engineSendCommand(MOVE, self.current_player.to_bytes(1) + move.toBytes())
 
-                self.canvas.wait_variable(self.promotion_ui)
-                self.canvas.unbind("<Button-1>")
-                self.canvas.bind("<Button-1>", self.onClick)
-
-                self.promotePawn(to_sq, self.current_player, self.promotion_type)
-            
         self.current_player ^= 1
-        self.handler.queuePush(UpdateLogEvent())
+        self.handler.queuePush(UpdateLogEvent(self.board[to_sq].fentype, move, self.game_ply))
+
+    def waitPromotion(self):
+        while self.promotion_ui:
+            self.canvas.update()
+            self.canvas.update_idletasks()
 
     # Returns the clicked-on tile's coordinates 
     def getMouseClickPos(self, event) -> tuple:
@@ -900,15 +844,26 @@ class Board():
             else:
                 self.setTileColor(dest, alpha_blend({self.board_color_light: 0.8, "#edda95": 0.8})) if (dest % 8) % 2 == 0 else self.setTileColor(dest, alpha_blend({self.board_color_dark: 0.8, "#edda95": 0.8}))    
 
-    def findMove(self, moves: list, from_sq: int = 0, to_sq: int = 0, flags: int = 0) -> Move:
+    def findMove(self, moves: list, from_sq: int = None, to_sq: int = None, flags: int = None) -> Move:
         mask = 0
 
-        if to_sq:
+        if to_sq != None:
             mask |= (0b111111 << 0)
-        if from_sq:
+        else:
+            to_sq = 0
+
+        if from_sq != None:
             mask |= (0b111111 << 6) 
-        if flags:
-            mask |= (0b1111   << 12)
+        else:
+            from_sq = 0
+
+        if flags != None:
+            mask |= (0b001111 << 12)
+        else:
+            flags = 0
+
+        if mask == 0:
+            return Move(0)
 
         for move in moves:
             if (move.getInternal() & mask) == ((flags << 12) | (from_sq << 6) | to_sq):
@@ -917,45 +872,51 @@ class Board():
         return Move(0)
 
     def onRelease(self, event):
-        if self.selected_piece != None:
+        if self._control_variables["drag_calls"] > 60 and self.selected_piece != None:
             destinations = [move.getTo() for move in self.moves]
             drop_sq = self.getMouseClickPos(event)
+            
             if drop_sq in destinations:
                 self.resetSelectedColor()
                 self.resetSelectedMovesColor(destinations)
 
                 move = self.findMove(self.moves, self.selected_piece, drop_sq)
-                self.playMove(move, HUMAN, NOMOVE)
+                if (move.getFlags() >= PR_KNIGHT and (move.getFlags() != CAPTURE and move.getFlags() != EN_PASSANT)):
+                    if drop_sq in self.board:
+                        self.canvas.delete(self.board[drop_sq].uniqueCode)
 
-                x1 = ((drop_sq % 8) * self.size) + int(self.size/2) + self.offset_x
-                y1 = ((7 - (drop_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
-                self.canvas.coords(self.board[drop_sq].uniqueCode, x1, y1)
+                    x1 = ((drop_sq % 8) * self.size) + int(self.size/2) + self.offset_x
+                    y1 = ((7 - (drop_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
+                    self.canvas.coords(self.board[self.selected_piece].uniqueCode, x1, y1)
+
+                    self._control_variables["promotion_sq"] = drop_sq
+                    self.showPromotionUI()
+
+                    self.waitPromotion()
+
+                    move.setFlags(typeToFlag(self.promotion_type, drop_sq in self.board))
+                    
+
+                self.playMove(move, NOMOVE)
 
                 if self.use_ai:
                     self.requestAIMove()
 
                 self.moves.clear()
-                self.selected_piece = None
-                # self.onReleaseMove(self.selected_piece, dropCoords)
-                # self.moves = []
-                # self.selected_piece = ()
-                # self.current_player = int(not self.current_player)
-            # elif self.selected_piece in self.board:
-            #     x1 = (self.selected_piece[1] * self.size) + int(self.size/2) + self.offset_x
-            #     y1 = (self.selected_piece[0] * self.size) + int(self.size/2) + self.offset_y
-            #     self.canvas.coords(self.board[self.selected_piece].uniqueCode, x1, y1)
-            # self.animations_done = True 
-            else:
-                x1 = ((self.selected_piece % 8) * self.size) + int(self.size/2) + self.offset_x
-                y1 = ((7 - (self.selected_piece // 8)) * self.size) + int(self.size/2) + self.offset_y
-                self.canvas.coords(self.board[self.selected_piece].uniqueCode, x1, y1)
+                self.selected_piece = None 
+                return
             
-            self.canvas.unbind("<ButtonRelease-1>")
+        self._control_variables["drag_calls"] = 0
+        if self.selected_piece in self.board:
+            x1 = ((self.selected_piece % 8) * self.size) + int(self.size/2) + self.offset_x
+            y1 = ((7 - (self.selected_piece // 8)) * self.size) + int(self.size/2) + self.offset_y
+            self.canvas.coords(self.board[self.selected_piece].uniqueCode, x1, y1)
         
     def onDrag(self, event):
-        self.canvas.bind("<ButtonRelease-1>", self.onRelease)
+        self._control_variables["drag_calls"] += 1
+
         try:
-            if self.selected_piece != None:
+            if self.selected_piece != None and self._control_variables["drag_calls"] > 5:
                 self.canvas.tag_raise(self.board[self.selected_piece].uniqueCode)
                 self.canvas.coords(self.board[self.selected_piece].uniqueCode, event.x, event.y)
                 pass
@@ -998,20 +959,26 @@ class Board():
 
             # If the user clicks on a move
             elif click_sq in destinations:
-                self.canvas.unbind("<ButtonRelease-1>")
                 self.resetSelectedColor()
         
                 self.resetSelectedMovesColor(destinations)
 
                 move = self.findMove(self.moves, self.selected_piece, click_sq)
-                self.playMove(move, HUMAN)
+
+                if (move.getFlags() >= PR_KNIGHT and (move.getFlags() != CAPTURE and move.getFlags() != EN_PASSANT)):
+                    self._control_variables["promotion_sq"] = click_sq
+                    self.showPromotionUI()
+
+                    self.waitPromotion()
+
+                    move.setFlags(typeToFlag(self.promotion_type, click_sq in self.board))
+
+                self.playMove(move)
                 self.moves.clear()
                 self.selected_piece = None
 
                 if self.use_ai:
                     self.requestAIMove()
-
-                self.canvas.bind("<ButtonRelease-1>", self.onRelease)
                 
             # If the user clicks on an empty square
             else:
@@ -1024,54 +991,7 @@ class Board():
 
         moves = arrayU16toMoves(move_codes)
 
-        # allMoves = []
-        # for key in board:
-        #     moves = []
-        #     if board[key].type == PAWN and board[key].color == side_color:
-        #         moves = self.pawnMoves(key[0], key[1], board)
-        #     if board[key].type == KNIGHT and board[key].color == side_color:
-        #         moves = self.knightMoves(key[0], key[1], board)
-        #     if board[key].type == BISHOP and board[key].color == side_color:
-        #         moves = self.bishopMoves(key[0], key[1], board)
-        #     if board[key].type == ROOK and board[key].color == side_color:
-        #         moves = self.rookMoves(key[0], key[1], board)
-        #     if board[key].type == QUEEN and board[key].color == side_color:
-        #         moves = self.queenMoves(key[0], key[1], board)
-        #     if board[key].type == KING and board[key].color == side_color:
-        #         moves = self.kingMoves(key[0], key[1], board)
-            
-        #     for move in moves:
-        #         copy_board = board.copy()
-        #         copy_board[move] = copy_board[key]
-        #         copy_board.pop(key)
-        #         if not self.inCheck(copy_board, side_color) and 0 < move[0] < 8 and 0 < move[1] < 8:
-        #             allMoves.append(move)
-
         return moves
-    
-    def generateAllPseudoMoves(self, board: dict, side_color: int):
-        allMoves = []
-
-        for key in board:
-            moves = []
-            if board[key].type == PAWN and board[key].color == side_color:
-                moves = self.pawnMoves(key[0], key[1], board)
-            if board[key].type == KNIGHT and board[key].color == side_color:
-                moves = self.knightMoves(key[0], key[1], board)
-            if board[key].type == BISHOP and board[key].color == side_color:
-                moves = self.bishopMoves(key[0], key[1], board)
-            if board[key].type == ROOK and board[key].color == side_color:
-                moves = self.rookMoves(key[0], key[1], board)
-            if board[key].type == QUEEN and board[key].color == side_color:
-                moves = self.queenMoves(key[0], key[1], board)
-                
-            if board[key].type == KING and board[key].color == side_color:
-                moves = self.kingMoves(key[0], key[1], board)
-            
-            allMoves += moves
-
-        return allMoves
-
 
     def inCheck(self, color: int) -> bool:
         return int(self.engineSendCommand(INCHECK, color))              
@@ -1081,37 +1001,6 @@ class Board():
 
         if square > 63 or square < 0:
             return moves
-                 
-        # pieceType = self.board[square].type
-        # pieceColor = self.board[square].color
-
-        # if pieceType == PAWN:
-        #     moves = self.pawnMoves(row, col, board)
-
-        # if pieceType == KNIGHT:
-        #     moves = self.knightMoves(row, col, board)
-
-        # if pieceType == ROOK:
-        #     moves = self.rookMoves(row, col, board)
-
-        # if pieceType == BISHOP:
-        #     moves = self.bishopMoves(row, col, board)
-
-        # if pieceType == QUEEN:
-        #     moves = self.queenMoves(row, col, board)
-        
-        # if pieceType == KING:
-        #     moves = self.kingMoves(row, col, board)
-
-        
-        # finalMoves = []
-        # for move in moves:
-        #     tempBoard = self.board.copy()
-        #     tempPiece = tempBoard[(row, col)]
-        #     tempBoard[move] = tempPiece
-        #     tempBoard.pop((row, col))
-        #     if not self.inCheck(tempBoard, pieceColor):
-        #         finalMoves.append(move)
 
         move_codes = self.engineSendCommand(GENMOVES, square.to_bytes(1))
         moves = arrayU16toMoves(move_codes)
@@ -1120,346 +1009,66 @@ class Board():
     
     def onPromotionClick(self, event):
         try:
-            clicked_square = int(self.canvas.itemcget(self.canvas.find_overlapping(event.x,event.y,event.x,event.y)[0], "tags")[0])
-        
-            if clicked_square == 0:
-                # self.canvas.delete(self.board[pawnPos].uniqueCode)
-                # self.board.pop(pawnPos)
-                # self.addpiece(self.createPiece("q") if color else self.createPiece("Q"), pawnPos[0], pawnPos[1])
-                # self.drawPiece(self.board[pawnPos], pawnPos[0], pawnPos[1])
-                # self.canvas.delete("promotion")
-                # self.promotion_ui.set(True)
-                # self.promotion_squares_white=False
-                # self.promotion_squares_black=False
-
-                self.promotion_type = QUEEN
-            elif clicked_square == 1:
-                # self.canvas.delete(self.board[pawnPos].uniqueCode)
-                # self.board.pop(pawnPos)
-                # self.addpiece(self.createPiece("b") if color else self.createPiece("B"), pawnPos[0], pawnPos[1])
-                # self.drawPiece(self.board[pawnPos], pawnPos[0], pawnPos[1])
-                # self.canvas.delete("promotion")
-                # self.promotion_ui.set(True)
-                # self.promotion_squares_white=False
-                # self.promotion_squares_black=False
-
-                self.promotion_type = BISHOP
-            elif clicked_square == 2:
-                # self.canvas.delete(self.board[pawnPos].uniqueCode)
-                # self.board.pop(pawnPos)
-                # self.addpiece(self.createPiece("r") if color else self.createPiece("R"), pawnPos[0], pawnPos[1])
-                # self.drawPiece(self.board[pawnPos], pawnPos[0], pawnPos[1])
-                # self.canvas.delete("promotion")
-                # self.promotion_ui.set(True)
-                # self.promotion_squares_white=False
-                # self.promotion_squares_black=False
-
-                self.promotion_type = ROOK
-            elif clicked_square == 3:
-                # self.canvas.delete(self.board[pawnPos].uniqueCode)
-                # self.board.pop(pawnPos)
-                # self.addpiece(self.createPiece("n") if color else self.createPiece("N"), pawnPos[0], pawnPos[1])
-                # self.drawPiece(self.board[pawnPos], pawnPos[0], pawnPos[1])
-                # self.canvas.delete("promotion")
-                # self.promotion_ui.set(True)
-                # self.promotion_squares_white=False
-                # self.promotion_squares_black=False
-
-                self.promotion_type = KNIGHT
-            else:
-                return
-            
-            self.canvas.delete("promotion")
-            self.promotion_ui.set(False) 
+            clicked_square = int(self.canvas.itemcget(self.canvas.find_overlapping(event.x,event.y,event.x,event.y)[0], "tags")[2])
         except:
-            pass
+            return
+    
+        if clicked_square == 0:
+            self.promotion_type = QUEEN
+        elif clicked_square == 1:
+            self.promotion_type = KNIGHT
+        elif clicked_square == 2:
+            self.promotion_type = ROOK
+        elif clicked_square == 3: 
+            self.promotion_type = BISHOP      
+        else:
+            return
+        
+        self.canvas.delete("promotion")
+        self.canvas.bind("<Button-1>", self.onClick)
+        self.promotion_ui = False
 
     def showPromotionUI(self):
         self.canvas.unbind("<Button-1>")
         self.canvas.bind("<Button-1>", lambda event: self.onPromotionClick(event))
-        self.promotion_ui.set(True)
+        self.promotion_ui = True
+        sq_size = int(self.size * 0.9)
         
         if self.current_player == WHITE:
             for i in range(4):
-                x1 = self.offset_x + (i * self.size)
-                y1 = self.offset_y - self.size - 5
+                x1 = self.offset_x + (i * sq_size)
+                y1 = self.offset_y - sq_size - 5
 
-                x0 = self.offset_x + (i * self.size) + (self.size//2)
-                y0 = y1 + (self.size//2)
+                x0 = self.offset_x + (i * sq_size) + (sq_size//2)
+                y0 = y1 + (sq_size//2)
                 
-                x2 = x1 + self.size
-                y2 = y1 + self.size
-                self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"{i}", "promotion", "square"))
-                self.canvas.create_image(x0, y0, image=self.fenToImage[self.fenToImage.keys[7+i]], tags=("promotion", "piece"), anchor="c")
+                x2 = x1 + sq_size
+                y2 = y1 + sq_size
+                self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"pr{i}", "promotion", "square"))
+                self.canvas.create_image(x0, y0, image=self.fenToImage[list(self.fenToImage.keys())[7+i]], tags=("promotion", "piece"), anchor="c")
                 self.canvas.tag_raise("piece")
                 self.canvas.tag_lower("square")
         if self.current_player == BLACK:
             for i in range(4):
-                x1 = self.offset_x + (i * self.size)
+                x1 = self.offset_x + (i * sq_size)
                 y1 = self.offset_y + 5 + (8 * self.size)
+                x2 = x1 + sq_size
+                y2 = y1 + sq_size
 
-                x0 = self.offset_x + (i * self.size) + (self.size//2)
-                y0 = y1 + (self.size//2)
-
-                x2 = x1 + self.size
-                y2 = y1 + self.size
-                self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"{i}", "promotion", "square"))
-                self.canvas.create_image(x0, y0, image=self.fenToImage[self.fenToImage.keys[1+i]], tags=("promotion", "piece"), anchor="c")
+                x0 = self.offset_x + (i * sq_size) + (sq_size//2)
+                y0 = y1 + (sq_size//2)
+    
+                self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"pr{i}", "promotion", "square"))
+                self.canvas.create_image(x0, y0, image=self.fenToImage[list(self.fenToImage.keys())[1+i]], tags=("promotion", "piece"), anchor="c")
                 self.canvas.tag_raise("piece")
                 self.canvas.tag_lower("square")
 
     def promotePawn(self, pawn_sq: int, player_color: int, promotion_type: int):
-
         self.canvas.delete(self.board[pawn_sq].uniqueCode)
         self.createPiece(pawn_sq, promotion_type, player_color)
         self.drawPiece(self.board[pawn_sq], pawn_sq)
         
-        # self.canvas.unbind("<Button-1>")
-        # self.canvas.bind("<Button-1>", lambda event: self.onPromotionClick(event, pawnPos, color))
-        
-        # if color == WHITE:
-        #     self.promotion_squares_white = True
-        #     for i in range(4):
-        #         x1 = self.offset_x + (i * self.size)
-        #         x0 = self.offset_x + (i * self.size) + (self.size//2)
-        #         y1 = self.offset_y- self.size - 5
-        #         y0 = y1 + (self.size//2)
-        #         x2 = x1 + self.size
-        #         y2 = y1 + self.size
-        #         self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"{i}", "promotion", "square"))
-        #         self.canvas.create_image(x0, y0, image=self.auziliary_pieces[4+i], tags=("promotion", "pieces"), anchor="c")
-        #         self.canvas.tag_raise("pieces")
-        #         self.canvas.tag_lower("squares")
-        # if color == BLACK:
-        #     self.promotion_squares_black = True
-        #     for i in range(4):
-        #         x1 = self.offset_x + (i * self.size)
-        #         x0 = self.offset_x + (i * self.size) + (self.size//2)
-        #         y1 = self.offset_y+ 5 + (8 * self.size)
-        #         y0 = y1 + (self.size//2)
-        #         x2 = x1 + self.size
-        #         y2 = y1 + self.size
-        #         self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"{i}", "promotion", "square"))
-        #         self.canvas.create_image(x0, y0, image=self.auziliary_pieces[i], tags=("promotion", "pieces"), anchor="c")
-        #         self.canvas.tag_raise("pieces")
-        #         self.canvas.tag_lower("squares")
-
-        # self.canvas.wait_variable(self.promotion_ui)
-        # self.canvas.bind("<Button-1>", self.onClick)
-
-    # def promotePawn_ai(self, pawnPos: tuple, promotion: str):
-    #     self.canvas.delete(self.board[pawnPos].uniqueCode)
-    #     self.addpiece(self.createPiece(promotion if not self.current_player else promotion.lower()), pawnPos[0], pawnPos[1])
-    #     self.drawPiece(self.board[pawnPos], pawnPos[0], pawnPos[1])
-
-    def pawnMoves(self, row: int, col: int, board: dict) -> list:
-        moves = []
-
-        pieceColor = board[(row, col)].color
-
-        offset = -1 if pieceColor == WHITE else 1
-
-        moves = [(row+offset, col)]
-        if (row == 6 or row == 1) and not (row+2*offset, col) in board and not (row+offset, col) in board:
-            moves.append((row+2*offset, col))
-        for i in [1, -1]:
-            if (row, col+i) in board and board[(row, col+i)].type == PAWN and board[(row, col+i)].color != pieceColor and board[(row, col+i)].uniqueCode in self.enpassant:
-                moves.append((row+offset, col+i))
-            if (row+offset, col+i) in board and board[(row+offset, col+i)].color != pieceColor:
-                moves.append((row+offset, col+i))
-        if (row+offset, col) in board:
-            moves.remove((row+offset, col))
-            
-        return moves
-
-    def knightMoves(self, row: int, col: int, board: dict) -> list:
-        moves = []
-
-        pieceColor = board[(row, col)].color
-
-        for possibleMove in [(row+1, col+2), (row+1, col-2), (row+2, col+1), (row+2, col-1), (row-1, col+2), (row-1, col-2), (row-2, col+1), (row-2, col-1)]:
-            if not (possibleMove in board and board[possibleMove].color == pieceColor) and 0 <= possibleMove[0] <= 8 and 0 <= possibleMove[1] <= 8:
-                moves.append(possibleMove)
-                
-        return moves
-    
-    def rookMoves(self, row: int, col: int, board: dict) -> list:
-        moves = []
-
-        pieceColor = board[(row, col)].color
-
-        for i in range(1, 8-row):
-            if (row+i, col) in board:
-                if board[(row+i, col)].color != pieceColor:
-                    moves.append((row+i, col))
-                    break
-                break
-            moves.append((row+i, col))
-        for i in range(row-1, -1, -1):
-            if (i, col) in board:
-                if board[(i, col)].color != pieceColor:
-                    moves.append((i, col))
-                    break
-                break
-            moves.append((i, col))
-        for i in range(1, 8-col):
-            if (row, col+i) in board:
-                if board[(row, col+i)].color != pieceColor:
-                    moves.append((row, col+i))
-                    break
-                break
-            moves.append((row, col+i))
-        for i in range(col-1, -1, -1):
-            if (row, i) in board:
-                if board[(row, i)].color != pieceColor:
-                    moves.append((row, i))
-                    break
-                break
-            moves.append((row, i))
-        
-        return moves
-
-    def bishopMoves(self, row: int, col: int, board: dict) -> list:
-        moves = []
-
-        pieceColor = board[(row, col)].color
-
-        for i in range(1, min(8-row, 8-col)):
-            if (row+i, col+i) in board:
-                if board[(row+i, col+i)].color != pieceColor:
-                    moves.append((row+i, col+i))
-                    break
-                break
-            moves.append((row+i, col+i))
-        for i in range(1, min(row, col)+1):
-            if (row-i, col-i) in board:
-                if board[(row-i, col-i)].color != pieceColor:
-                    moves.append((row-i, col-i))
-                    break
-                break
-            moves.append((row-i, col-i))
-        for i in range(1, min(row+1, 8-col)):
-            if (row-i, col+i) in board:
-                if board[(row-i, col+i)].color != pieceColor:
-                    moves.append((row-i, col+i))
-                    break
-                break
-            moves.append((row-i, col+i))
-        for i in range(1, min(8-row, col+1)):
-            if (row+i, col-i) in board:
-                if board[(row+i, col-i)].color != pieceColor:
-                    moves.append((row+i, col-i))
-                    break
-                break
-            moves.append((row+i, col-i))
-        return moves
-
-    def queenMoves(self, row: int, col: int, board: dict) -> list:
-        moves = []
-
-        pieceColor = board[(row, col)].color
-
-        for i in range(1, min(8-row, 8-col)):
-            if (row+i, col+i) in board:
-                if board[(row+i, col+i)].color != pieceColor:
-                    moves.append((row+i, col+i))
-                    break
-                break
-            moves.append((row+i, col+i))
-        for i in range(1, min(row, col)+1):
-            if (row-i, col-i) in board:
-                if board[(row-i, col-i)].color != pieceColor:
-                    moves.append((row-i, col-i))
-                    break
-                break
-            moves.append((row-i, col-i))
-        for i in range(1, min(row+1, 8-col)):
-            if (row-i, col+i) in board:
-                if board[(row-i, col+i)].color != pieceColor:
-                    moves.append((row-i, col+i))
-                    break
-                break
-            moves.append((row-i, col+i))
-        for i in range(1, min(8-row, col+1)):
-            if (row+i, col-i) in board:
-                if board[(row+i, col-i)].color != pieceColor:
-                    moves.append((row+i, col-i))
-                    break
-                break
-            moves.append((row+i, col-i))
-        for i in range(1, 8-row):
-            if (row+i, col) in board:
-                if board[(row+i, col)].color != pieceColor:
-                    moves.append((row+i, col))
-                    break
-                break
-            moves.append((row+i, col))
-        for i in range(row-1, -1, -1):
-            if (i, col) in board:
-                if board[(i, col)].color != pieceColor:
-                    moves.append((i, col))
-                    break
-                break
-            moves.append((i, col))
-        for i in range(1, 8-col):
-            if (row, col+i) in board:
-                if board[(row, col+i)].color != pieceColor:
-                    moves.append((row, col+i))
-                    break
-                break
-            moves.append((row, col+i))
-        for i in range(col-1, -1, -1):
-            if (row, i) in board:
-                if board[(row, i)].color != pieceColor:
-                    moves.append((row, i))
-                    break
-                break
-            moves.append((row, i))
-    
-        return moves
-
-    def kingMoves(self, row: int, col: int, board: dict) -> list:
-        moves = []
-
-        for move in [(row+1, col), (row-1, col), (row+1, col+1), (row-1, col-1), (row+1, col-1), (row-1, col+1), (row, col+1), (row, col-1)]:
-            if move in board and board[move].color != board[(row, col)].color:
-                moves.append(move)
-            if move not in board:
-                moves.append(move)
-            
-        
-        for key in board:
-            if board[key].fentype == "r" and (row, col) == (0, 4) and board[key].color == self.current_player and key in [(row,0), (row,7)]:
-                blocked = False
-                offset = -1 if key[1] < 4 else 1
-                for element in board:
-                    blocked = 0 < element[1] < 4 and element[0] == row if key[1] == 0 else 4 < element[1] < key[1] and element[0] == row
-                    if blocked:
-                        break
-                if key == (row, 0) and not self.black_queenside_castle:
-                    blocked = True
-                elif key == (row,7) and not self.black_kingside_castle:
-                    blocked = True
-                if not blocked and (row, 4 + offset) in moves:
-                    moves.append((row, 4 + 2*offset))
-            if board[key].fentype == "R" and (row, col) == (7, 4) and board[key].color == self.current_player and key in [(row,0), (row,7)]:
-                blocked = False
-                offset = -1 if key[1] < 4 else 1
-                for element in board:
-                    blocked = 0 < element[1] < 4 and element[0] == row if key[1] == 0 else 4 < element[1] < key[1] and element[0] == row
-                    if blocked:
-                        break
-                if key == (row, 0) and not self.white_queenside_castle:
-                    blocked = True
-                elif key == (row,7) and not self.white_kingside_castle:
-                    blocked = True
-                if not blocked and (row, 4 + offset) in moves:
-                    moves.append((row, 4 + 2*offset))
-        
-        return moves
-                
-
-
 if __name__ == "__main__":
-    board = Board(debug = True, start_player=WHITE, ai = True);
+    #start="rnbqkbnr/1pppppPp/8/8/8/8/PpPPPPP1/RNBQKBNR w KQkq"
+    board = Board(debug = True, start_player = WHITE, ai = False, );
     board.mainloop()

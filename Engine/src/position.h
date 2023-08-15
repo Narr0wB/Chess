@@ -884,7 +884,7 @@ inline Move* Position::generate_legals_for(Square sq, Move* list)
 		case make_piece(Them, KNIGHT):
 			//If the checker is either a pawn or a knight, the only legal moves are to capture
 			//the checker. Only non-pinned pieces can capture it
-			b1 = (attacker_from<Us>(pt, checker_square, all) & not_pinned) & bitboard_at(sq);
+			b1 = (attackers_from<Us>(checker_square, all) & not_pinned) & bitboard_at(sq);
 			while (b1) *list++ = Move(pop_lsb(&b1), checker_square, CAPTURE);
 
 			return list;
@@ -951,7 +951,7 @@ inline Move* Position::generate_legals_for(Square sq, Move* list)
 		//3. The king is not in check
 		if (pt == KING) {
 			if (!((history[game_ply].entry & oo_mask<Us>()) | ((all | danger) & oo_blockers_mask<Us>())))
-				*list++ = Us == WHITE ? Move(e1, h1, OO) : Move(e8, h8, OO);
+				*list++ = Us == WHITE ? Move(e1, g1, OO) : Move(e8, g8, OO);
 			if (!((history[game_ply].entry & ooo_mask<Us>()) |
 				((all | (danger & ~ignore_ooo_danger<Us>())) & ooo_blockers_mask<Us>())))
 				*list++ = Us == WHITE ? Move(e1, c1, OOO) : Move(e8, c8, OOO);

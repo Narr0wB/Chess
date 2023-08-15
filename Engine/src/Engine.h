@@ -28,7 +28,7 @@ namespace Engine {
 	typedef uint8_t u8;
 
 	enum class CommandType {
-		NONE = 0, SET, MOVE, UNDO, MOVEREQ, GENMOVES, INCHECK, EXIT
+		NONE = 0, SET, MOVE, UNDO, MOVEREQ, GENMOVES, INCHECK, FEN, EXIT
 	};
 
 	struct Command {

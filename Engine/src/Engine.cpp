@@ -4,7 +4,7 @@
 #define START_POSITION "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/ w KQkq"
 #define DEBUG_POSITION "rnb2b2/2p1k1p1/1p1q4/3p4/P7/8/P4PPP/RNB1KBNR w KQ - 0 9"
 
-#define PIPE_NAME TEXT("\\\\.\\pipe\\chs")
+#define PIPE_NAME TEXT("\\\\.\\pipe\\chess")
 
 namespace Engine {
 	void Application::Run() {
@@ -48,10 +48,10 @@ namespace Engine {
 				if (m_MoveList.empty())
 					return;
 
-				if (m_Position.getCurrentColor())
-					m_Position.undo<BLACK>(m_MoveList.back());
-				else
+				if (m_Position.getCurrentColor() == BLACK)
 					m_Position.undo<WHITE>(m_MoveList.back());
+				else
+					m_Position.undo<BLACK>(m_MoveList.back());
 
 				m_MoveList.pop_back();
 
@@ -62,8 +62,8 @@ namespace Engine {
 			case CommandType::MOVEREQ: {
 				u8 level = command.args[1];
 
-				if (level > 4)
-					level = 4;
+				if (level > 6)
+					level = 6;
 
 				Color aiColor = static_cast<Color>(command.args[2]);
 				Move move;
@@ -102,6 +102,8 @@ namespace Engine {
 				Square sq = (Square)command.args[1];
 				Piece pc = m_Position.at(sq);
 
+				std::cout << (int)pc << std::endl;
+
 				if (pc > 7 && pc != NO_PIECE) {
 					MoveList<BLACK> mL(m_Position, sq);
 					
@@ -130,6 +132,14 @@ namespace Engine {
 				break;
 			}
 
+			case CommandType::FEN: {
+				std::string fen = m_Position.fen();
+
+				Write((void*)fen.c_str(), fen.size());
+
+				break;
+			}
+
 			case CommandType::EXIT: {
 				if (m_Debug) std::cout << "[DEBUG] Closing..." << std::endl;
 
@@ -138,6 +148,7 @@ namespace Engine {
 				ClosePipe();
 				//CreatePipe();
 				//m_ShouldClose = true;
+				//exit(0);
 
 				if (ConnectNamedPipe(m_hPipe, NULL) == FALSE) std::cout << "[ERROR] Cannot reconnect to the client " << GetLastError() << std::endl;
 				break;
@@ -147,7 +158,7 @@ namespace Engine {
 	}
 
 	CommandType Parse(u8 ct) {
-		if (ct > 0x07)
+		if (ct > 0x08)
 			return CommandType::NONE;
 
 		return (CommandType)ct;
