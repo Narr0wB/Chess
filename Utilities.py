@@ -103,9 +103,9 @@ class GuiMoveElement():
         ]
 
         self.text = [
-            self.canvas.create_text(x + int(self.width * 0.17), y, text=f"{self.ply}", font=("Noto Sans Medium", 12, "bold"), fill="#999999", tags=("move_log", self.id, "ply_text")),
-            self.canvas.create_text(x + int(self.width * 0.4), y, text=self.white_text, font=("Noto Sans Medium", 12), fill=alpha_blend({"#999999": 1, "#FFFFFF": 0}), tags=("move_log", self.id, "white_text")),
-            self.canvas.create_text(x + int(self.width * 0.7), y, text=self.black_text, font=("Noto Sans Medium", 12), fill=alpha_blend({"#999999": 1, "#000000": 0}), tags=("move_log", self.id, "black_text"))
+            self.canvas.create_text(x + int(self.width * 0.17), y, text=f"{self.ply}", font=("Noto Sans Medium", 12, "bold"), fill="#999999", tags=("move_log", self.id, "ply_text"), anchor=tk.W),
+            self.canvas.create_text(x + int(self.width * 0.35), y, text=self.white_text, font=("Noto Sans Medium", 12), fill=alpha_blend({"#999999": 1, "#FFFFFF": 0}), tags=("move_log", self.id, "white_text"), anchor=tk.W),
+            self.canvas.create_text(x + int(self.width * 0.7), y, text=self.black_text, font=("Noto Sans Medium", 12), fill=alpha_blend({"#999999": 1, "#000000": 0}), tags=("move_log", self.id, "black_text"), anchor=tk.W)
         ]
 
 

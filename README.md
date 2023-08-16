@@ -1,6 +1,9 @@
 # Narrow's chess engine
 This is a chess application written in python and a chess engine written in C++.
 
+## Credit
+Credit to [nkarve](https://github.com/nkarve) for their [surge](https://github.com/nkarve/surge) move generator.
+
 ## Installation
 In order to use the application, you will need the tkinter and pillow modules that can be easily installed through the python package manager.
 

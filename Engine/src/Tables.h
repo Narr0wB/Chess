@@ -1,5 +1,21 @@
 #pragma once
 
+/*
+MIT License
+
+Copyright (c) 2020 DiehardTheTryhard
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+*/
+
 #include "types.h"
 
 extern const Bitboard KING_ATTACKS[NSQUARES];
@@ -18,7 +34,7 @@ extern Bitboard ROOK_ATTACKS[NSQUARES][4096];
 extern void initialise_rook_attacks();
 
 
-extern constexpr Bitboard get_rook_attacks(Square square, Bitboard occ);
+extern Bitboard get_rook_attacks(Square square, Bitboard occ);
 extern Bitboard get_xray_rook_attacks(Square square, Bitboard occ, Bitboard blockers);
 
 extern Bitboard get_bishop_attacks_for_init(Square square, Bitboard occ);
@@ -29,7 +45,7 @@ extern Bitboard BISHOP_ATTACKS[NSQUARES][512];
 extern void initialise_bishop_attacks();
 
 
-extern constexpr Bitboard get_bishop_attacks(Square square, Bitboard occ);
+extern Bitboard get_bishop_attacks(Square square, Bitboard occ);
 extern Bitboard get_xray_bishop_attacks(Square square, Bitboard occ, Bitboard blockers);
 
 extern Bitboard SQUARES_BETWEEN_BB[NSQUARES][NSQUARES];

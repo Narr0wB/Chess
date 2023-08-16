@@ -1,6 +1,22 @@
 #pragma once
 #pragma warning(disable : 26812)
 
+/*
+MIT License
+
+Copyright (c) 2020 DiehardTheTryhard
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+*/
+
 #include <cstdint>
 #include <string>
 #include <ostream>
@@ -104,13 +120,13 @@ extern const Bitboard k2;
 extern const Bitboard k4;
 extern const Bitboard kf;
 
-extern inline int pop_count(Bitboard x);
-extern inline int sparse_pop_count(Bitboard x);
-extern inline Square pop_lsb(Bitboard* b);
+int pop_count(Bitboard x);
+int sparse_pop_count(Bitboard x);
+Square pop_lsb(Bitboard* b);
 
 extern const int DEBRUIJN64[64];
 extern const Bitboard MAGIC;
-extern constexpr Square bsf(Bitboard b);
+Square bsf(Bitboard b);
 
 constexpr Rank rank_of(Square s) { return Rank(s >> 3); }
 constexpr File file_of(Square s) { return File(s & 0b111); }
