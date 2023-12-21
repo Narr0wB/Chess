@@ -21,7 +21,7 @@ windll.shcore.SetProcessDpiAwareness(1)
 mixer.init()
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-CHESS_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+CHESS_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 # BUGGED POSITION: 2kr1bnr/ppp1pppp/4b3/8/1nP2B2/N7/PPK1PPPP/R4BNR w - - 0 1
 
@@ -63,7 +63,7 @@ SQSTR = {
 MOVE_TYPESTR_B = [
 	"", "", " O-O", " O-O-O", " N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)", " (capture)", "", " e.p.", "",
 	" N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)"
-];
+]
 
 MOVE_FLAGSTR = [
     "", "", "OO", "OOO", "", "", "", "", "x", "", "ep", "", "", "", "", ""
@@ -355,7 +355,15 @@ class Board():
         if self.debug:
             self.parent.bind("<F8>", lambda e: print(self.toFen()))
 
-        atexit.register(self.engineSendCommand, EXIT)
+        # DEBUG
+        def debug_atexit(board):
+            try:
+                print(board.toFen())
+                board.engineSendCommand(EXIT)
+            except Exception as e:
+                pass
+
+        atexit.register(debug_atexit, self)
 
         self.handler = Handler()
         self.handler.addHandle(ENGINE_MOVE_EVENT, self.moveAI)
@@ -377,6 +385,11 @@ class Board():
         self.loadBoard(start)
         
     def onClose(self):
+        try:
+            print(self.toFen())
+        except:
+            pass
+
         self.engineSendCommand(EXIT)
         win32file.CloseHandle(self.engine_handle)
 
@@ -515,10 +528,9 @@ class Board():
         self.canvas.delete("anim")
 
         self.canvas.create_image(self.gui["offx"] + int(self.gui["width"] * 0.05), self.gui["offy"] + int(self.gui["height"] * 0.056), image=self.loading_animation[idx], tags=("anim",), anchor=tk.W)
+        
         idx += 1
-
-        if idx == len(self.loading_animation):
-            idx = 0
+        idx %= len(self.loading_animation)
         
         if not self._control_variables["engine_calculating"]:
             self.canvas.delete("anim")
@@ -663,6 +675,8 @@ class Board():
         self.enpassant.clear()
         self.selected_piece = None
         self.move_log.clear()
+        self._control_variables = {"engine_calculating": False, "movelog_count": 2, "movelog_list": [], "drag_calls": 0, "restore": False, "promotion_sq": None}
+        self.promotion_ui = False
 
         self.engineSendCommand(SET, fen.encode())
         self.initFromFen(fen)
@@ -1070,5 +1084,5 @@ class Board():
         
 if __name__ == "__main__":
     #start="rnbqkbnr/1pppppPp/8/8/8/8/PpPPPPP1/RNBQKBNR w KQkq"
-    board = Board(debug = True, start_player = WHITE, ai = False, );
+    board = Board(debug = True, start_player = WHITE, ai = True);
     board.mainloop()

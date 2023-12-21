@@ -8,7 +8,54 @@
 #include "Utils.h"
 
 #define INFINITY 2000000000
+
+#define NO_HASH_ENTRY 0x46464646
+
+#define FLAG_EMPTY 0
+#define FLAG_EXACT 1
+#define FLAG_ALPHA 2
+#define FLAG_BETA 3
+
+typedef uint8_t TranspositionFlags;
+
 using namespace std::chrono_literals;
+
+struct Transposition {
+    uint64_t hash;
+    TranspositionFlags flags;
+
+    int score;
+    int depth;
+    Move best;
+};
+
+class TranspositionTable {
+private:
+    Transposition* m_DataArray;
+    uint32_t m_Capacity;
+    const uint8_t m_BucketSize = 1;
+
+    uint32_t m_Size;
+public:
+    TranspositionTable(uint32_t capacity) : m_Capacity(capacity), m_Size(0) {
+        m_DataArray = new Transposition[capacity * m_BucketSize];
+        memset(m_DataArray, 0, sizeof(Transposition) * m_Capacity * m_BucketSize);
+    }
+
+    ~TranspositionTable() {
+        delete m_DataArray;
+    }
+
+    void push_position(Transposition t);
+    int probe_hash(uint64_t hash, int alpha, int beta, int depth);
+
+    inline uint32_t size() { return m_Size; };
+};
+
+static TranspositionTable table(0x4000000);
+
+static int mSCalls = 0;
+static std::chrono::system_clock::time_point start_time;
 
 const int black_pawn_table[64] = {  0,  0,  0,  0,  0,  0,  0,  0,
                                    50, 50, 50, 50, 50, 50, 50, 50,
@@ -139,37 +186,48 @@ int imbalance(Piece& square, Piece* pieces);
 int imbalance_t(Piece& square, Piece* pieces);
 int middle_game_eval(Position& b);
 
-static int mSCalls = 0;
-static std::chrono::system_clock::time_point start_time;
 template<Color color>
 int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
     ++mSCalls;
     MoveList<color> mL(board);
-    if (depth == 0 || mL.size() == 0) {
-        return Evaluate(board);
+
+    TranspositionFlags flags = FLAG_EXACT;
+    if (depth == 0 || mL.size() == 0 || (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > 15 * 1000ms)) {
+        int score = Evaluate(board);
+
+        table.push_position({board.get_hash(), flags, score, depth, Move(0)});
+        return score;
     }
 
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > 15 * 1000ms) {
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count();
-        return Evaluate(board);
-    }
+    depth--;
 
-    depth -= 1;
     if (color == WHITE) {
         int maxEval = -INFINITY;
         for (Move m : mL) {
             board.play<color>(m);
-            int eval = moveScore<~color>(board, Aalpha, Bbeta, depth);
-            board.undo<color>(m);
 
-            if (eval > maxEval)
-                maxEval = eval;
-            if (eval > Aalpha)
-                Aalpha = eval;
+            int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
 
-            if (eval >= Bbeta)
+            if (score == NO_HASH_ENTRY) {
+                score = moveScore<~color>(board, Aalpha, Bbeta, depth);
+                board.undo<color>(m);
+            }
+            else {
+                board.undo<color>(m);
+            }
+
+            if (score > maxEval)
+                maxEval = score;
+            if (score > Aalpha)
+                Aalpha = score;
+
+            if (score >= Bbeta) {
+                flags = FLAG_BETA;
                 break;
+            }
         }
+
+        table.push_position(Transposition{ board.get_hash(), flags, maxEval, depth, Move(0)});
 
         return maxEval;
     }
@@ -177,17 +235,29 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
         int minEval = INFINITY;
         for (Move m : mL) {
             board.play<color>(m);
-            int eval = moveScore<~color>(board, Aalpha, Bbeta, depth);
-            board.undo<color>(m);
 
-            if (eval < minEval)
-                minEval = eval;
-            if (eval < Bbeta)
-                Bbeta = eval;
+            int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
 
-            if (eval <= Aalpha)
+            if (score == NO_HASH_ENTRY) {
+                score = moveScore<~color>(board, Aalpha, Bbeta, depth);
+                board.undo<color>(m);
+            }
+            else {
+                board.undo<color>(m);
+            }
+
+            if (score < minEval)
+                minEval = score;
+            if (score < Bbeta)
+                Bbeta = score;
+
+            if (score <= Aalpha) {
+                flags = FLAG_ALPHA;
                 break;
+            }
         }
+
+        table.push_position(Transposition{ board.get_hash(), flags, minEval, depth, Move(0) });
 
         return minEval;
     }
