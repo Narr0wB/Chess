@@ -3,58 +3,22 @@
 #define EVALUATE_H
 
 #include <iostream>
+
 #include "position.h"
 #include "types.h"
+
 #include "Utils.h"
+#include "Transposition.h"
+#include "Log.h"
 
 #define INFINITY 2000000000
-
-#define NO_HASH_ENTRY 0x46464646
-
-#define FLAG_EMPTY 0
-#define FLAG_EXACT 1
-#define FLAG_ALPHA 2
-#define FLAG_BETA 3
-
-typedef uint8_t TranspositionFlags;
+#define TIME_LIMIT 15 * 1000ms
 
 using namespace std::chrono_literals;
 
-struct Transposition {
-    uint64_t hash;
-    TranspositionFlags flags;
-
-    int score;
-    int depth;
-    Move best;
-};
-
-class TranspositionTable {
-private:
-    Transposition* m_DataArray;
-    uint32_t m_Capacity;
-    const uint8_t m_BucketSize = 1;
-
-    uint32_t m_Size;
-public:
-    TranspositionTable(uint32_t capacity) : m_Capacity(capacity), m_Size(0) {
-        m_DataArray = new Transposition[capacity * m_BucketSize];
-        memset(m_DataArray, 0, sizeof(Transposition) * m_Capacity * m_BucketSize);
-    }
-
-    ~TranspositionTable() {
-        delete m_DataArray;
-    }
-
-    void push_position(Transposition t);
-    int probe_hash(uint64_t hash, int alpha, int beta, int depth);
-
-    inline uint32_t size() { return m_Size; };
-};
-
 static TranspositionTable table(0x4000000);
-
-static int mSCalls = 0;
+static int nodes_searched = 0;
+static int search_depth = 4;
 static std::chrono::system_clock::time_point start_time;
 
 const int black_pawn_table[64] = {  0,  0,  0,  0,  0,  0,  0,  0,
@@ -176,7 +140,7 @@ const int white_king_eg_table[64] = { -50,-30,-30,-30,-30,-30,-30,-50,
 
 int newEvaluate(Position& eB);
 
-int Evaluate(Position& evaluateBoard);
+int Evaluate(Position& position, int depth);
 
 int piece_to_idx(Piece& p);
 int piece_color(Piece& p);
@@ -186,35 +150,40 @@ int imbalance(Piece& square, Piece* pieces);
 int imbalance_t(Piece& square, Piece* pieces);
 int middle_game_eval(Position& b);
 
-template<Color color>
+template<Color C>
 int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
-    ++mSCalls;
-    MoveList<color> mL(board);
-
+    nodes_searched++;
     TranspositionFlags flags = FLAG_EXACT;
-    if (depth == 0 || mL.size() == 0 || (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > 15 * 1000ms)) {
-        int score = Evaluate(board);
 
-        table.push_position({board.get_hash(), flags, score, depth, Move(0)});
+    if (depth == 0 || 
+        board.checkmate<C>() || 
+        board.stalemate<C>() ||
+        (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > TIME_LIMIT)) {
+        int score = Evaluate(board, depth);
+        
+        // if (board.checkmate<C>()) { std::cout << board << std::endl; std::cout << depth << std::endl; }
+
+        table.push_position({board.get_hash(), flags, score, 0, Move(0)});
         return score;
     }
 
+    MoveList<C> mL(board);
+
     depth--;
 
-    if (color == WHITE) {
+    if (C == WHITE) {
         int maxEval = -INFINITY;
+
         for (Move m : mL) {
-            board.play<color>(m);
+            board.play<C>(m);
 
             int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
 
             if (score == NO_HASH_ENTRY) {
-                score = moveScore<~color>(board, Aalpha, Bbeta, depth);
-                board.undo<color>(m);
+                score = moveScore<~C>(board, Aalpha, Bbeta, depth);
             }
-            else {
-                board.undo<color>(m);
-            }
+
+            board.undo<C>(m);
 
             if (score > maxEval)
                 maxEval = score;
@@ -227,24 +196,22 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
             }
         }
 
-        table.push_position(Transposition{ board.get_hash(), flags, maxEval, depth, Move(0)});
+        table.push_position(Transposition{ board.get_hash(), flags, maxEval, (uint8_t) depth, Move(0)});
 
         return maxEval;
     }
     else {
         int minEval = INFINITY;
         for (Move m : mL) {
-            board.play<color>(m);
+            board.play<C>(m);
 
             int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
 
             if (score == NO_HASH_ENTRY) {
-                score = moveScore<~color>(board, Aalpha, Bbeta, depth);
-                board.undo<color>(m);
+                score = moveScore<~C>(board, Aalpha, Bbeta, depth);
             }
-            else {
-                board.undo<color>(m);
-            }
+
+            board.undo<C>(m);
 
             if (score < minEval)
                 minEval = score;
@@ -257,7 +224,7 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
             }
         }
 
-        table.push_position(Transposition{ board.get_hash(), flags, minEval, depth, Move(0) });
+        table.push_position(Transposition{ board.get_hash(), flags, minEval, (uint8_t) depth, Move(0) });
 
         return minEval;
     }
@@ -265,31 +232,33 @@ int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
 }
 
 
-template <Color color>
+template <Color C>
 Move findBestMove(Position& board, int depth) {
 
     Move bestMove;
-    int bestMoveScore = color == WHITE ? -INFINITY : INFINITY;
+    int bestMoveScore = C == WHITE ? -INFINITY : INFINITY;
 
+    search_depth = depth;
 
-    MoveList<color> mL(board);
+    MoveList<C> mL(board);
     start_time = std::chrono::system_clock::now();
 
     for (Move m : mL) {
-        board.play<color>(m);
-        int score = moveScore<~color>(board, -INFINITY, INFINITY, depth);
-        board.undo<color>(m);
+        board.play<C>(m);
+        int score = moveScore<~C>(board, -INFINITY, INFINITY, depth);
+        board.undo<C>(m);
 
-        if (color == BLACK && score < bestMoveScore) {
+        // if (C == WHITE) std::cout << m << " " << score << std::endl;
+
+        if (C == BLACK && score < bestMoveScore) {
             bestMove = m;
             bestMoveScore = score;
         }
-        else if (color == WHITE && score > bestMoveScore) {
+        else if (C == WHITE && score > bestMoveScore) {
             bestMove = m;
             bestMoveScore = score;
         }
     }
-
 
     return bestMove;
 }

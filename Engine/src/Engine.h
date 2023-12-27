@@ -5,10 +5,15 @@
 #include <iostream>
 #include <chrono>
 #include <Windows.h>
+#include <thread>
+
 #include "tables.h"
 #include "types.h"
 #include "position.h"
 #include "Evaluate.h"
+#include "Log.h"
+
+#define ACK 0xFF
 
 #define WRITE_MOVELIST(move_list) \
 {\
@@ -23,18 +28,26 @@
 	Write(buf, counter * sizeof(uint16_t));\
 };
 
+using namespace std::chrono_literals;
 
 namespace Engine {
 	typedef uint8_t u8;
 
-	enum class CommandType {
-		NONE = 0, SET, MOVE, UNDO, MOVEREQ, GENMOVES, INCHECK, FEN, EXIT
+	enum CommandType : uint16_t {
+		NONE = 0, SET, MOVE, UNDO, MOVEREQ, GENMOVES, CHECK, CHECKMATE, FEN, COLOR, EXIT
+	};
+
+	static const char* COMMAND_STR_B[] = {"NONE", "SET", "MOVE", "UNDO", "MOVEREQ", "GENMOVES", "CHECK", "CHECKMATE", "FEN", "COLOR", "EXIT"};
+
+	struct CommandHeader {
+		CommandType type;
+		WORD payload_size;
 	};
 
 	struct Command {
-		CommandType type;
-		u8 args[256];
-		DWORD arg_len;
+		CommandHeader header;
+
+		u8 payload[256];
 	};
 
 	CommandType Parse(u8 ct);
@@ -48,18 +61,19 @@ namespace Engine {
 
 			HANDLE m_hPipe;
 			bool m_Debug;
+			std::string m_sPipe;
 
 		private:
 			void CreatePipe();
 			void ClosePipe();
 			Command Read();
-			void Write(void* data, size_t data_len);
+			void Write(void* data, size_t data_len, int attempt = 0);
 
 		public:
-			Application() : m_Debug(true), m_ShouldClose(false) { CreatePipe(); }
+			Application(char* pipe_key) : m_Debug(true), m_ShouldClose(false), m_sPipe(pipe_key) { CreatePipe(); }
 			void Run();	
 	};
 
-	inline Application* CreateApplication() { return new Application(); };
+	inline Application* CreateApplication(char* pipe_key) { return new Application(pipe_key); };
 }
 #endif // ENGINE_H

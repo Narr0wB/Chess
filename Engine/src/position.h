@@ -158,6 +158,9 @@ public:
 		return attackers_from<~C>(bsf(bitboard_of(C, KING)), all_pieces<WHITE>() | all_pieces<BLACK>());
 	}
 
+	template<Color C> bool checkmate() const;
+	template<Color C> bool stalemate() const;
+
 	template<Color C> void play(Move m);
 	template<Color C> void undo(Move m);
 
@@ -198,8 +201,8 @@ inline Bitboard Position::attackers_from(Square s, Bitboard occ) const {
 	return C == WHITE ? (pawn_attacks<BLACK>(s) & piece_bb[WHITE_PAWN]) |
 		(attacks<KNIGHT>(s, occ) & piece_bb[WHITE_KNIGHT]) |
 		(attacks<BISHOP>(s, occ) & (piece_bb[WHITE_BISHOP] | piece_bb[WHITE_QUEEN])) |
-		(attacks<ROOK>(s, occ) & (piece_bb[WHITE_ROOK] | piece_bb[WHITE_QUEEN])) :
-
+		(attacks<ROOK>(s, occ) & (piece_bb[WHITE_ROOK] | piece_bb[WHITE_QUEEN])) 
+		:
 		(pawn_attacks<WHITE>(s) & piece_bb[BLACK_PAWN]) |
 		(attacks<KNIGHT>(s, occ) & piece_bb[BLACK_KNIGHT]) |
 		(attacks<BISHOP>(s, occ) & (piece_bb[BLACK_BISHOP] | piece_bb[BLACK_QUEEN])) |
@@ -263,6 +266,232 @@ Bitboard Position::blockers_to(Square s, Bitboard occ) const {
 	while (attackers) blockers |= SQUARES_BETWEEN_BB[s][pop_lsb(&attackers)];
 	return blockers;
 }*/
+
+template<Color Us>
+bool Position::checkmate() const {
+	if (Us != side_to_play) { return 0; }
+	constexpr Color Them = ~Us;
+
+	const Bitboard us_bb = all_pieces<Us>();
+	const Bitboard them_bb = all_pieces<Them>();
+	const Bitboard all = us_bb | them_bb;
+
+
+	const Square our_king = bsf(bitboard_of(Us, KING));
+	const Square their_king = bsf(bitboard_of(Them, KING));
+
+	auto attackers = attackers_from<Them>(our_king, all);
+	if (!attackers) { return 0; }
+
+	const Bitboard our_diag_sliders = diagonal_sliders<Us>();
+	const Bitboard their_diag_sliders = diagonal_sliders<Them>();
+	const Bitboard our_orth_sliders = orthogonal_sliders<Us>();
+	const Bitboard their_orth_sliders = orthogonal_sliders<Them>();
+
+
+	//Squares that our king cannot move to
+	Bitboard danger = 0;
+
+	// General purpose bitboards
+	Bitboard b1, b2;
+
+	//For each enemy piece, add all of its attacks to the danger bitboard
+	danger |= pawn_attacks<Them>(bitboard_of(Them, PAWN)) | attacks<KING>(their_king, all);
+
+	b1 = bitboard_of(Them, KNIGHT);
+	while (b1) danger |= attacks<KNIGHT>(pop_lsb(&b1), all);
+
+	b1 = their_diag_sliders;
+	//all ^ SQUARE_BB[our_king] is written to prevent the king from moving to squares which are 'x-rayed'
+	//by enemy bishops and queens
+	while (b1) danger |= attacks<BISHOP>(pop_lsb(&b1), all ^ SQUARE_BB[our_king]);
+
+	b1 = their_orth_sliders;
+	//all ^ SQUARE_BB[our_king] is written to prevent the king from moving to squares which are 'x-rayed'
+	//by enemy rooks and queens
+	while (b1) danger |= attacks<ROOK>(pop_lsb(&b1), all ^ SQUARE_BB[our_king]);
+
+	//The king can move to all of its surrounding squares, except ones that are attacked, and
+	//ones that have our own pieces on them
+	b1 = attacks<KING>(our_king, all) & ~(us_bb | danger);
+
+	// If the king can move, then it is not checkmate
+	if (b1) { /*std::cout << "FAILED KING MOVES";*/ return 0; }
+
+	Square s;
+
+	Bitboard temp_checkers = attacks<KNIGHT>(our_king, all) & bitboard_of(Them, KNIGHT)
+		| pawn_attacks<Us>(our_king) & bitboard_of(Them, PAWN);
+
+	Bitboard candidates = attacks<ROOK>(our_king, them_bb) & their_orth_sliders
+		| attacks<BISHOP>(our_king, them_bb) & their_diag_sliders;
+
+	Bitboard temp_pinned = 0;
+	while (candidates) {
+		s = pop_lsb(&candidates);
+		b1 = SQUARES_BETWEEN_BB[our_king][s] & us_bb;
+
+		//Do the squares in between the enemy slider and our king contain any of our pieces?
+		//If not, add the slider to the checker bitboard
+		if (b1 == 0) temp_checkers ^= SQUARE_BB[s];
+		//If there is only one of our pieces between them, add our piece to the pinned bitboard 
+		else if ((b1 & b1 - 1) == 0) temp_pinned ^= b1;
+	}
+
+	// If it is a double check and we cannot move the king, then it is checkmate
+	if (sparse_pop_count(temp_checkers) == 2) { return 1; }
+
+	Bitboard not_pinned = ~temp_pinned;
+
+	Square checker_square = bsf(temp_checkers);
+
+	// If we can capture the attacking square, then it is not checkmate
+	if (attackers_from<Us>(checker_square, all) & not_pinned) { /*std::cout << "FAILED ATTACKABLE ATTACKER";*/ return 0; }
+
+	Bitboard quiet_mask = SQUARES_BETWEEN_BB[our_king][checker_square];
+
+	//For each ally piece, add all of its attacks to the b2 bitboard
+	b2 = pawn_attacks<Us>(bitboard_of(Us, PAWN) & not_pinned);
+
+	b1 = bitboard_of(Us, KNIGHT) & not_pinned;
+	while (b1) b2 |= attacks<KNIGHT>(pop_lsb(&b1), all);
+
+	b1 = our_diag_sliders & not_pinned;
+	while (b1) b2 |= attacks<BISHOP>(pop_lsb(&b1), all);
+
+	b1 = our_orth_sliders & not_pinned;
+	while (b1) b2 |= attacks<ROOK>(pop_lsb(&b1), all);
+
+
+	if (quiet_mask & b2) { /*std::cout << "FAILED QUIET BLOCK";*/ return 0; }
+
+	if (board[checker_square] == make_piece(Them, PAWN)) {
+		//If the checker is a pawn, we must check for e.p. moves that can capture it
+			//This evaluates to true if the checking piece is the one which just double pushed
+		if (checkers == shift<relative_dir<Us>(SOUTH)>(SQUARE_BB[history[game_ply].epsq])) {
+			//b1 contains our pawns that can capture the checker e.p.
+			b1 = pawn_attacks<Them>(history[game_ply].epsq) & bitboard_of(Us, PAWN) & not_pinned;
+
+			// If there is an e.p. move, then it is not checkmate
+			if (b1) { /*std::cout << "FAILED EN PASSANT CAPTURE";*/ return 0; }
+		}
+	}
+
+	return 1;
+}
+
+template<Color Us>
+bool Position::stalemate() const
+{
+	if (Us != side_to_play) { return 0; }
+	constexpr Color Them = ~Us;
+
+	const Bitboard us_bb = all_pieces<Us>();
+	const Bitboard them_bb = all_pieces<Them>();
+	const Bitboard all = us_bb | them_bb;
+
+	const Square our_king = bsf(bitboard_of(Us, KING));
+	const Square their_king = bsf(bitboard_of(Them, KING));
+
+	auto attackers = attackers_from<Them>(our_king, all);
+	if (attackers) { return 0; }
+
+	const Bitboard our_diag_sliders = diagonal_sliders<Us>();
+	const Bitboard their_diag_sliders = diagonal_sliders<Them>();
+	const Bitboard our_orth_sliders = orthogonal_sliders<Us>();
+	const Bitboard their_orth_sliders = orthogonal_sliders<Them>();
+
+
+	//Squares that our king cannot move to
+	Bitboard danger = 0;
+
+	// General purpose bitboards
+	Bitboard b1, b2;
+
+	//For each enemy piece, add all of its attacks to the danger bitboard
+	danger |= pawn_attacks<Them>(bitboard_of(Them, PAWN)) | attacks<KING>(their_king, all);
+
+	b1 = bitboard_of(Them, KNIGHT);
+	while (b1) danger |= attacks<KNIGHT>(pop_lsb(&b1), all);
+
+	b1 = their_diag_sliders;
+	//all ^ SQUARE_BB[our_king] is written to prevent the king from moving to squares which are 'x-rayed'
+	//by enemy bishops and queens
+	while (b1) danger |= attacks<BISHOP>(pop_lsb(&b1), all ^ SQUARE_BB[our_king]);
+
+	b1 = their_orth_sliders;
+	//all ^ SQUARE_BB[our_king] is written to prevent the king from moving to squares which are 'x-rayed'
+	//by enemy rooks and queens
+	while (b1) danger |= attacks<ROOK>(pop_lsb(&b1), all ^ SQUARE_BB[our_king]);
+
+	//The king can move to all of its surrounding squares, except ones that are attacked, and
+	//ones that have our own pieces on them
+	b1 = attacks<KING>(our_king, all) & ~(us_bb | danger);
+
+	// If the king can move, then it is not checkmate
+	if (b1) { return 0; }
+
+	Square s;
+
+	Bitboard temp_checkers = attacks<KNIGHT>(our_king, all) & bitboard_of(Them, KNIGHT)
+		| pawn_attacks<Us>(our_king) & bitboard_of(Them, PAWN);
+
+	Bitboard candidates = attacks<ROOK>(our_king, them_bb) & their_orth_sliders
+		| attacks<BISHOP>(our_king, them_bb) & their_diag_sliders;
+
+	Bitboard temp_pinned = 0;
+	while (candidates) {
+		s = pop_lsb(&candidates);
+		b1 = SQUARES_BETWEEN_BB[our_king][s] & us_bb;
+
+		//Do the squares in between the enemy slider and our king contain any of our pieces?
+		//If not, add the slider to the checker bitboard
+		if (b1 == 0) temp_checkers ^= SQUARE_BB[s];
+		//If there is only one of our pieces between them, add our piece to the pinned bitboard 
+		else if ((b1 & b1 - 1) == 0) temp_pinned ^= b1;
+	}
+
+	// If it is a double check and we cannot move the king, then it is checkmate
+	if (sparse_pop_count(temp_checkers) == 2) { return 1; }
+
+	Bitboard not_pinned = ~temp_pinned;
+
+	Square checker_square = bsf(temp_checkers);
+
+	// If we can capture the attacking square, then it is not checkmate
+	if (attackers_from<Us>(checker_square, all) & not_pinned) { /*std::cout << "FAILED ATTACKABLE ATTACKER";*/ return 0; }
+
+	Bitboard quiet_mask = SQUARES_BETWEEN_BB[our_king][checker_square];
+
+	//For each ally piece, add all of its attacks to the b2 bitboard
+	b2 = pawn_attacks<Us>(bitboard_of(Us, PAWN) & not_pinned);
+
+	b1 = bitboard_of(Us, KNIGHT) & not_pinned;
+	while (b1) b2 |= attacks<KNIGHT>(pop_lsb(&b1), all);
+
+	b1 = our_diag_sliders & not_pinned;
+	while (b1) b2 |= attacks<BISHOP>(pop_lsb(&b1), all);
+
+	b1 = our_orth_sliders & not_pinned;
+	while (b1) b2 |= attacks<ROOK>(pop_lsb(&b1), all);
+
+
+	if (quiet_mask & b2) { /*std::cout << "FAILED QUIET BLOCK";*/ return 0; }
+
+	if (board[checker_square] == make_piece(Them, PAWN)) {
+		//If the checker is a pawn, we must check for e.p. moves that can capture it
+			//This evaluates to true if the checking piece is the one which just double pushed
+		if (checkers == shift<relative_dir<Us>(SOUTH)>(SQUARE_BB[history[game_ply].epsq])) {
+			//b1 contains our pawns that can capture the checker e.p.
+			b1 = pawn_attacks<Them>(history[game_ply].epsq) & bitboard_of(Us, PAWN) & not_pinned;
+
+			// If there is an e.p. move, then it is not checkmate
+			if (b1) { /*std::cout << "FAILED EN PASSANT CAPTURE";*/ return 0; }
+		}
+	}
+
+	return 1;
+}
 
 //Plays a move in the position
 template<Color C>
@@ -552,42 +781,42 @@ Move* Position::generate_legals(Move* list) {
 	const Bitboard not_pinned = ~pinned;
 
 	switch (sparse_pop_count(checkers)) {
-	case 2:
-		//If there is a double check, the only legal moves are king moves out of check
-		return list;
-	case 1: {
-		//It's a single check!
-		
-		Square checker_square = bsf(checkers);
-
-		switch (board[checker_square]) {
-		case make_piece(Them, PAWN):
-			//If the checker is a pawn, we must check for e.p. moves that can capture it
-			//This evaluates to true if the checking piece is the one which just double pushed
-			if (checkers == shift<relative_dir<Us>(SOUTH)>(SQUARE_BB[history[game_ply].epsq])) {
-				//b1 contains our pawns that can capture the checker e.p.
-				b1 = pawn_attacks<Them>(history[game_ply].epsq) & bitboard_of(Us, PAWN) & not_pinned;
-				while (b1) *list++ = Move(pop_lsb(&b1), history[game_ply].epsq, EN_PASSANT);
-			}
-			//FALL THROUGH INTENTIONAL
-		case make_piece(Them, KNIGHT):
-			//If the checker is either a pawn or a knight, the only legal moves are to capture
-			//the checker. Only non-pinned pieces can capture it
-			b1 = attackers_from<Us>(checker_square, all) & not_pinned;
-			while (b1) *list++ = Move(pop_lsb(&b1), checker_square, CAPTURE);
-
+		case 2:
+			//If there is a double check, the only legal moves are king moves out of check
 			return list;
-		default:
-			//We must capture the checking piece
-			capture_mask = checkers;
+		case 1: {
+			//It's a single check!
+		
+			Square checker_square = bsf(checkers);
+
+			switch (board[checker_square]) {
+			case make_piece(Them, PAWN):
+				//If the checker is a pawn, we must check for e.p. moves that can capture it
+				//This evaluates to true if the checking piece is the one which just double pushed
+				if (checkers == shift<relative_dir<Us>(SOUTH)>(SQUARE_BB[history[game_ply].epsq])) {
+					//b1 contains our pawns that can capture the checker e.p.
+					b1 = pawn_attacks<Them>(history[game_ply].epsq) & bitboard_of(Us, PAWN) & not_pinned;
+					while (b1) *list++ = Move(pop_lsb(&b1), history[game_ply].epsq, EN_PASSANT);
+				}
+				//FALL THROUGH INTENTIONAL
+			case make_piece(Them, KNIGHT):
+				//If the checker is either a pawn or a knight, the only legal moves are to capture
+				//the checker. Only non-pinned pieces can capture it
+				b1 = attackers_from<Us>(checker_square, all) & not_pinned;
+				while (b1) *list++ = Move(pop_lsb(&b1), checker_square, CAPTURE);
+
+				return list;
+			default:
+				//We must capture the checking piece
+				capture_mask = checkers;
 			
-			//...or we can block it since it is guaranteed to be a slider
-			quiet_mask = SQUARES_BETWEEN_BB[our_king][checker_square];
+				//...or we can block it since it is guaranteed to be a slider
+				quiet_mask = SQUARES_BETWEEN_BB[our_king][checker_square];
+				break;
+			}
+
 			break;
 		}
-
-		break;
-	}
 
 	default:
 		//We can capture any enemy piece

@@ -43,8 +43,8 @@ MOVE_FLAGSTR = [
 ]
 
 class Move:
-    def __init__(self, move_internal: int = 0, from_sq: int = 0, to_sq: int = 0, flags: int = 0):
-        if (move_internal):
+    def __init__(self, move_internal: int = -1, from_sq: int = 0, to_sq: int = 0, flags: int = 0):
+        if (move_internal != -1):
             self.move = move_internal
         else:
             self.move = int((flags << 12) | (from_sq << 6) | to_sq);

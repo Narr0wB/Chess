@@ -1,16 +1,59 @@
 #include "Evaluate.h"
 
+extern int search_depth;
 
-int Evaluate(Position& evaluateBoard) {
+int Evaluate(Position& position, int depth) {
     int score = 0;
-    Piece* pieces = evaluateBoard.getPieces();
 
-    if (evaluateBoard.in_check<WHITE>()) {
-        return -2000;
+    /*switch (C) {
+    case WHITE: {
+        if (position.checkmate<WHITE>()) {
+            return (SHRT_MIN / 2);
+        }
+        if (position.in_check<WHITE>()) {
+            score += -2000;
+        }
+        if (position.stalemate<WHITE>()) {
+            return 0;
+        }
+        break;
     }
-    if (evaluateBoard.in_check<BLACK>()) {
-        return 20000;
+    case BLACK: {
+        if (position.checkmate<BLACK>()) {
+            return (SHRT_MIN / 2);
+        }
+        if (position.in_check<BLACK>()) {
+            score += -2000;
+        }
+        if (position.stalemate<BLACK>()) {
+            return 0;
+        }
+        break;
     }
+    }*/
+
+    if (position.checkmate<WHITE>()) {
+        return (SHRT_MIN / 2) * ((float)(depth + 1) / search_depth);
+    }
+    if (position.checkmate<BLACK>()) {
+        return (SHRT_MAX / 2) * ((float)(depth + 1) / search_depth);
+    }
+
+    if (position.in_check<WHITE>()) {
+        score += -2000;
+    }
+    if (position.in_check<BLACK>()) {
+        score += 2000;
+    }
+
+    if (position.stalemate<WHITE>()) {
+        return 0;
+    }
+    if (position.stalemate<BLACK>()) {
+        return 0;
+    }
+
+    Piece* pieces = position.getPieces();
 
     for (uint8_t i = 0; i < NSQUARES; i++) {
         switch (pieces[i])
@@ -20,58 +63,58 @@ int Evaluate(Position& evaluateBoard) {
         case WHITE_PAWN:
             score += 100;
             score += white_pawn_table[i];
-            break; 
+            break;
         case WHITE_KNIGHT:
             score += 320;
             score += knight_table[i];
-            break; 
+            break;
         case WHITE_BISHOP:
             score += 330;
             score += white_bishop_table[i];
-            break; 
+            break;
         case WHITE_ROOK:
             score += 500;
             score += white_rook_table[i];
             break;
-        case WHITE_QUEEN: 
+        case WHITE_QUEEN:
             score += 900;
             score += white_queen_table[i];
-            break; 
+            break;
         case WHITE_KING:
-            if (evaluateBoard.ply() > 30)
+            /*if (position.ply() > 30)
                 score += white_king_mg_table[i];
-            if (evaluateBoard.ply() > 50)
-                score += white_king_eg_table[i];
+            if (position.ply() > 50)
+                score += white_king_eg_table[i];*/
             break;
         case BLACK_PAWN:
             score -= 100;
             score -= black_pawn_table[i];
-            break;  
+            break;
         case BLACK_KNIGHT:
             score -= 320;
             score -= knight_table[i];
-            break; 
+            break;
         case BLACK_BISHOP:
             score -= 330;
             score -= black_bishop_table[i];
-            break; 
-        case BLACK_ROOK: 
+            break;
+        case BLACK_ROOK:
             score -= 500;
             score -= black_rook_table[i];
-            break; 
+            break;
         case BLACK_QUEEN:
             score -= 900;
             score -= black_queen_table[i];
-            break; 
+            break;
         case BLACK_KING:
-            if (evaluateBoard.ply() > 30)
+            /*if (position.ply() > 30)
                 score -= black_king_mg_table[i];
-            if (evaluateBoard.ply() > 50)
-                score -= black_king_eg_table[i];
+            if (position.ply() > 50)
+                score -= black_king_eg_table[i];*/
             break;
         }
     }
-   
+
     return score;
 }
 
@@ -279,51 +322,4 @@ int newEvaluate(Position& eB) {
     return 0;
 }
 
-void TranspositionTable::push_position(Transposition t)
-{   
-    Transposition& entry = m_DataArray[t.hash % m_Capacity];
 
-    // If the entry is empty then set entry equal to t
-    if (entry.flags == FLAG_EMPTY) {
-        entry = t;
-        m_Size++;
-    }
-
-    
-    else {
-        // If the entry is not empty first check if its the same position
-        if (entry.hash == t.hash) {
-
-            // If the depth of the pushed transposition (t) is bigger (i.e. t's evaluation was due to a bigger search) then replace entry with t
-            if (entry.depth < t.depth) {
-                entry = t;
-            }
-        }
-        else {
-            // TODO: Implement collision safety mechanism
-        }
-    }
-}
-
-int TranspositionTable::probe_hash(uint64_t hash, int alpha, int beta, int depth)
-{
-    Transposition position = m_DataArray[hash % m_Capacity];
-
-    if (position.hash == hash) {
-        if (position.depth >= depth) {
-            if (position.flags) {
-                return position.score;
-            }
-
-            /*if (position.flags == FLAG_ALPHA && position.score <= alpha) {
-                return alpha;
-            }
-
-            if (position.flags == FLAG_BETA && position.score >= beta) {
-                return beta;
-            }*/
-        }
-    }
-    
-    return NO_HASH_ENTRY;
-}
