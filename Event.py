@@ -1,4 +1,5 @@
 from enum import Enum
+from Move import *
 import queue
 
 WINDOW_RESIZE_EVENT = 0
@@ -47,9 +48,15 @@ class WindowResizeEvent(Event):
         self.height = new_height
 
 class EngineMoveEvent(Event):
-    def __init__(self, move_code = 0):
+    def __init__(self, move: Move = None, move_code: int = 0):
         self.type = ENGINE_MOVE_EVENT
         self.move_code = move_code
+
+        self.move = move
+
+        if (self.move_code != 0):
+            self.move = Move(self.move_code)
+
 
 class UpdateLogEvent(Event):
     def __init__(self, fen_type, move, ply = 0, restore: bool = False):

@@ -17,9 +17,10 @@
 using namespace std::chrono_literals;
 
 static TranspositionTable table(0x4000000);
-static int nodes_searched = 0;
-static int search_depth = 4;
 static std::chrono::system_clock::time_point start_time;
+
+static int nodes_searched = 0;
+static int search_depth;
 
 const int black_pawn_table[64] = {  0,  0,  0,  0,  0,  0,  0,  0,
                                    50, 50, 50, 50, 50, 50, 50, 50,
@@ -138,117 +139,185 @@ const int white_king_eg_table[64] = { -50,-30,-30,-30,-30,-30,-30,-50,
                                       -30,-20,-10,  0,  0,-10,-20,-30,
                                       -50,-40,-30,-20,-20,-30,-40,-50, };
 
-int newEvaluate(Position& eB);
+struct SearchInfo {
+    uint32_t nodes;
+    uint8_t search_depth;
 
-int Evaluate(Position& position, int depth);
+    Move best;
+    Move k_moves[2][248]; 
+};
 
-int piece_to_idx(Piece& p);
-int piece_color(Piece& p);
-int piece_value(bool mg, Piece& square);
-int psqt_value(bool mg, Piece& square, int sq);
-int imbalance(Piece& square, Piece* pieces);
-int imbalance_t(Piece& square, Piece* pieces);
-int middle_game_eval(Position& b);
+int Evaluate(Position& position, int depth, int search_depth);
+
+int mvv_lva(const Move &m_, const Position &p_);
+
+// Order moves through shallow (zero depth) evaluations
+template <Color Us>
+struct move_sorting_criterion {
+    Move PV_move;
+    Position& pos_;
+
+    move_sorting_criterion(Position& p_, Move m_) : pos_(p_), PV_move(m_) {}; 
+
+    bool operator() (const Move& a, const Move& b) {
+        if (PV_move != NO_MOVE) {
+            // If we are ordering the moves in descending order with respect to their scores, then if we find the PV_move
+            // we need to assign to it the highest priority, which implies that the comparision a > b is false
+            if (a == PV_move) { return true; } 
+            
+            // If the opposite is true (b is equal to PV_move), then the comparison a > b is false
+            if (b == PV_move) { return false; }  
+        }
+
+        int a_relative_score = -1;
+        int b_relative_score = -1;
+
+        // All capure flags have the first bit set to 1
+        if (a.flags() == MoveFlags::CAPTURE) {
+            // pos_ is a member of the move_order_criterion struct
+            a_relative_score = mvv_lva(a, pos_);
+        }
+        else {
+            // TODO: Need to add a way to evaluate quiet moves (quiescence search)
+            a_relative_score = 0;
+        }
+
+        // All capure flags have the first bit set to 1
+        if (b.flags() == MoveFlags::CAPTURE) {
+            // pos_ is a member of the move_order_criterion struct
+            b_relative_score = mvv_lva(b, pos_);
+        }
+        else {
+            // TODO: Need to add a way to evaluate quiet moves (quiescence search)
+            b_relative_score = 0;
+        }
+
+        return a_relative_score > b_relative_score;
+    }
+};
+
+template<Color Us>
+void order_move_list(MoveList<Us>& m, Position& current_pos) {
+    Move PV_move = table.probe_hash(current_pos.get_hash(), 0, 0, 0).best;
+
+	//std::stable_sort(m.begin(), m.end(), move_sorting_criterion<Us>(current_pos, PV_move));
+
+    int scores[m.size()];
+    for (int i = 0; i < m.size(); ++i) {
+        if (m.begin()[i] == PV_move) {
+            scores[i] = 1000;
+            continue;
+        }
+        scores[i] = mvv_lva(m.begin()[i], current_pos);
+    }
+
+    for (int i = 0; i < m.size(); ++i) {
+        for (int j = i + 1; j < m.size(); ++j) {
+            if (scores[i] < scores[j]) {
+                int tmp = scores[i];
+                scores[i] = scores[j];
+                scores[j] = tmp;
+
+                auto tmp_move = m.begin()[i];
+                m.begin()[i] = m.begin()[j];
+                m.begin()[j] = tmp_move;
+            }
+        }
+    }
+}
 
 template<Color C>
 int moveScore(Position& board, int Aalpha, int Bbeta, int depth) {
     nodes_searched++;
-    TranspositionFlags flags = FLAG_EXACT;
 
     if (depth == 0 || 
         board.checkmate<C>() || 
         board.stalemate<C>() ||
         (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > TIME_LIMIT)) {
-        int score = Evaluate(board, depth);
         
-        // if (board.checkmate<C>()) { std::cout << board << std::endl; std::cout << depth << std::endl; }
+        int score = Evaluate(board, depth, search_depth);
+        table.push_position({board.get_hash(), FLAG_EXACT, score, 0, Move(0)});
 
-        table.push_position({board.get_hash(), flags, score, 0, Move(0)});
         return score;
     }
 
-    MoveList<C> mL(board);
-
     depth--;
 
-    if (C == WHITE) {
-        int maxEval = -INFINITY;
+    MoveList<C> mL(board);
+    order_move_list<C>(mL, board);
 
-        for (Move m : mL) {
-            board.play<C>(m);
+    Transposition node_ = { board.get_hash(), FLAG_EXACT, 0, depth, Move(0)};
+    int best_eval = C == WHITE ? -INFINITY : INFINITY;
 
-            int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
+    for (Move m : mL) {
+        board.play<C>(m);
 
-            if (score == NO_HASH_ENTRY) {
-                score = moveScore<~C>(board, Aalpha, Bbeta, depth);
+        //int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth).score;
+        int score = NO_SCORE;
+
+        if (score == NO_SCORE) {
+            score = moveScore<~C>(board, Aalpha, Bbeta, depth);
+        }
+
+        board.undo<C>(m);
+
+        if (C == WHITE) {
+            if (score > best_eval) {
+                best_eval = score;
+
+                node_.score = score;
+                node_.best = m;
             }
-
-            board.undo<C>(m);
-
-            if (score > maxEval)
-                maxEval = score;
-            if (score > Aalpha)
+            
+            if (score > Aalpha) {
                 Aalpha = score;
-
+            }
             if (score >= Bbeta) {
-                flags = FLAG_BETA;
+                node_.flags = FLAG_BETA;
                 break;
             }
-        }
+        } 
+        else {
+            if (score < best_eval) {
+                best_eval = score;
 
-        table.push_position(Transposition{ board.get_hash(), flags, maxEval, (uint8_t) depth, Move(0)});
-
-        return maxEval;
-    }
-    else {
-        int minEval = INFINITY;
-        for (Move m : mL) {
-            board.play<C>(m);
-
-            int score = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
-
-            if (score == NO_HASH_ENTRY) {
-                score = moveScore<~C>(board, Aalpha, Bbeta, depth);
+                node_.score = score;
+                node_.best = m;
             }
 
-            board.undo<C>(m);
-
-            if (score < minEval)
-                minEval = score;
-            if (score < Bbeta)
+            if (score < Bbeta) {
                 Bbeta = score;
-
+            }
             if (score <= Aalpha) {
-                flags = FLAG_ALPHA;
+                node_.flags = FLAG_ALPHA;
                 break;
             }
         }
+    } 
 
-        table.push_position(Transposition{ board.get_hash(), flags, minEval, (uint8_t) depth, Move(0) });
-
-        return minEval;
-    }
-
+    table.push_position(node_);
+    return best_eval;
 }
 
 
 template <Color C>
 Move findBestMove(Position& board, int depth) {
-
     Move bestMove;
     int bestMoveScore = C == WHITE ? -INFINITY : INFINITY;
 
     search_depth = depth;
+    nodes_searched = 0;
 
     MoveList<C> mL(board);
+    order_move_list<C>(mL, board);
+
     start_time = std::chrono::system_clock::now();
 
-    for (Move m : mL) {
+    for (const Move& m : mL) {
+        //LOG_INFO("Move: {} score: {}", m, mvv_lva(m, board));
         board.play<C>(m);
         int score = moveScore<~C>(board, -INFINITY, INFINITY, depth);
         board.undo<C>(m);
-
-        // if (C == WHITE) std::cout << m << " " << score << std::endl;
 
         if (C == BLACK && score < bestMoveScore) {
             bestMove = m;

@@ -8,11 +8,18 @@ import time
 import atexit
 import struct
 
-from ctypes import windll
+import ctypes
 from typing import List
 from Move import * 
 
 from colorama import *
+
+ENGINE_DLL_PATH = ""
+ENGINE_DLL: ctypes.CDLL = None
+_engine_create_instance = None
+_engine_exists_instance = None
+_engine_destroy_instance = None
+_engine_request_command = None
 
 START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -20,7 +27,7 @@ COMMAND_STR_B = ["NONE", "SET", "MOVE", "UNDO", "MOVEREQ", "GENMOVES", "CHECK", 
 COLOR_STR_B = ["WHITE", "BLACK"]
 
 BUF_LEN = 1024
-ACK = 0xFF
+OK = bytearray(b'\xFF\xFF')
 
 BLACK = 1
 WHITE = 0
@@ -49,150 +56,174 @@ EXIT      = 0x0A    # Payload: None
 #   |        --------------- Payload length (2 BYTES)
 #    -------- Command identifier (1 BYTE)
 
+def initialize_engine_dll(path: str):
+    global ENGINE_DLL_PATH
+    global ENGINE_DLL 
+    
+    global _engine_create_instance
+    global _engine_exists_instance
+    global _engine_destroy_instance 
+    global _engine_request_command
+
+
+    ENGINE_DLL_PATH = path
+    ENGINE_DLL = ctypes.CDLL(path)
+
+    _engine_create_instance     =   ENGINE_DLL.CreateInstance
+    _engine_exists_instance     =   ENGINE_DLL.ExistsInstance
+    _engine_destroy_instance    =   ENGINE_DLL.DestroyInstance
+    _engine_request_command     =   ENGINE_DLL.RequestCommand
+
+    # Creating global functors pointing to dll's functions
+    _engine_create_instance.argtypes = [ctypes.c_uint16, ctypes.c_bool]
+    _engine_create_instance.restype = ctypes.c_bool
+
+
+    _engine_exists_instance.argtypes = [ctypes.c_uint16]
+    _engine_exists_instance.restype = ctypes.c_bool
+
+
+    _engine_destroy_instance.argtypes = [ctypes.c_uint16]
+    _engine_destroy_instance.restype = ctypes.c_bool
+
+    _engine_request_command.argtypes = [ctypes.c_uint16, Command]
+    _engine_request_command.restype = Response
+
+# DLL's structs
+    
+class CommandType(ctypes.c_uint16):
+    NONE, SET, MOVE, UNDO, MOVEREQ, GENMOVES, CHECK, CHECKMATE, FEN, COLOR = range(10)
+
+class CommandHeader(ctypes.Structure):
+    _fields_ = [
+        ("type", CommandType),
+        ("payload_size", ctypes.c_uint16)
+    ]
+
+class Command(ctypes.Structure):
+    _fields_ = [
+        ("header", CommandHeader),
+        ("payload", ctypes.c_uint8 * 256)
+    ]
+
+class Response(ctypes.Structure):
+    _fields_ = [
+        ("payload_size", ctypes.c_uint16),
+        ("payload", ctypes.c_uint8 * 512)
+    ]
+
 
 
 class Engine():
-    def __init__(self, exe_path: str = None, pipe_id: str = None):
-        self.engine_path = exe_path
-        self.engine_handle = None
-        self.engine_process = None
-        self.engine_pipe_id = pipe_id
+    def __init__(self, engine_id: ctypes.c_uint16 = None, debug_console: bool = False):
+        if (ENGINE_DLL == None):
+            raise Exception("Engine dll not initialized! Initialize the Engine's dll using EngineAPI.initialize_engine_dll(path_to_dll)")
 
-        if (self.engine_pipe_id == None):
-            self.engine_pipe_id: str = self.generate_unique_id()
-
-        if (self.engine_path == None):
-            self.attach(pipe_id)
+        if (engine_id != None and _engine_exists_instance(engine_id)): 
+            self.__engine_id = engine_id
         else:
-            self.initialize_engine(exe_path)
+            self.__engine_id = self.generate_unique_id()
+
+        _engine_create_instance(self.__engine_id, debug_console)
         
-        atexit.register(self.cleanup)
+    #     atexit.register(self.cleanup)
 
-    def cleanup(self):
-        if (self.engine_handle != None):
-            self.exit()
-
-    def initialize_engine(self, exe_path: str):      
-        try:
-            self.engine_process = subprocess.Popen([exe_path, self.engine_pipe_id], creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-        except Exception as e:
-            logger.error(f"Could not start engine {e}")
-
-        time.sleep(1.5)
-
-        self.attach(self.engine_pipe_id)
+    # def cleanup(self):
+    #     if (self.engine_handle != None):
+    #         self.exit()
         
-    def generate_unique_id(self) -> str:
-        return ''.join(random.choices(string.ascii_uppercase + string.digits, k = 8))
-
-    def attach(self, pipe_id: str):
-        self.engine_handle = self.get_handle_from_pipe(pipe_id)
-
-    def get_handle_from_pipe(self, pipe_id: str):
-        try:
-            # Create the pipe for communication
-
-            handle = win32file.CreateFile(f"\\\\.\\pipe\\{pipe_id}", 
-                                          win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-                                          0,
-                                          None,
-                                          win32file.OPEN_EXISTING,
-                                          0,
-                                          None)
-            
-            return handle
-        except pywintypes.error as e:
-            if e.args[0] == 2:
-                logger.error("No pipe available")
-            elif e.args[0] == 109:
-                logger.error("Could not open pipe, exiting")
-                exit(0) 
-
-        return None
+    def generate_unique_id(self) -> int:
+        return random.randrange(0, 0xFFFF)
     
     def set(self, fen_str: str):
-        self.send_command(SET, fen_str.encode())
+        rsp = self.send_command(SET, fen_str.encode())
+        
+        if (rsp != OK):
+            logger.error("Could not set the engine at given position!")
 
     def move(self, playing_color: int, move: Move):
-        self.send_command(MOVE, bytearray(playing_color.to_bytes(1) + move.getInternal().to_bytes(2, "little")))
+        rsp = self.send_command(MOVE, bytearray(playing_color.to_bytes(1) + move.getInternal().to_bytes(2, "little")))
 
+        if (rsp != OK):
+            logger.error("Could not play the move!")
+        
     def undo(self):
-        self.send_command(UNDO)
+        rsp = self.send_command(UNDO)
+
+        if (rsp != OK):
+            logger.error("Could not undo the last move!")
 
     def ai_move(self, ai_level: int, ai_color: int) -> Move:
-        self.send_command(MOVEREQ, bytearray([ai_level, ai_color]))
-        move_internal = self.recv_response()
+        move_internal = self.send_command(MOVEREQ, bytearray([ai_level, ai_color]))
 
         return Move(int.from_bytes(move_internal, "little"))
     
     def generate_moves(self, square: int) -> List[Move]:
-        self.send_command(GENMOVES, square.to_bytes(1))
-        move_array = self.recv_response()
+        move_array = self.send_command(GENMOVES, square.to_bytes(1))
 
         return arrayU16toMoves(move_array)
     
     def in_check(self, color: int) -> bool:
-        self.send_command(CHECK, color.to_bytes(1))
-        result = self.recv_response()
+        result = self.send_command(CHECK, color.to_bytes(1))
 
         return bool(int.from_bytes(result, "little"))
     
     def fen(self) -> str:
-        self.send_command(FEN)
-        fen_str = self.recv_response()
+        fen_str = self.send_command(FEN)
 
         return fen_str.decode()
     
     def checkmate(self, color: int):
-        self.send_command(CHECKMATE, color.to_bytes(1))
-        result = self.recv_response()
+        result = self.send_command(CHECKMATE, color.to_bytes(1))
 
         return bool(int.from_bytes(result, "little"))
     
     def color(self):
-        self.send_command(COLOR)
-        result = self.recv_response()
+        result = self.send_command(COLOR)
 
         return int.from_bytes(result, "little")
     
     def exit(self):
-        self.send_command(EXIT)
+        done = _engine_destroy_instance(self.__engine_id)
 
-        self.engine_handle = None
+        if (not done):
+            logger.error("Could exit the engine!")
+
+        self.engine_id = None
             
-    def send_command(self, command_id: int, payload: bytearray = bytearray(), attempt: int = 0) -> int:
+    def send_command(self, command_id: CommandType, payload: bytearray = bytearray()) -> bytearray:
         if command_id > EXIT or command_id < NONE: 
-            return -2
+            raise Exception("Invalid command type!")
         
-        if attempt == 3:
-            return -3
+        ctypes_payload = (ctypes.c_uint8 * 256)(*payload)
+        cmd = Command(header=CommandHeader(type=command_id, payload_size=len(payload)), payload=ctypes_payload)
 
-        try:
-            # According to the payload header specification
-            command_header = struct.pack("<HH", command_id, len(payload))
+        resp: Response = _engine_request_command(self.__engine_id, cmd)
 
-            # for b in command_header: print(b)
+        return bytearray(resp.payload)[:resp.payload_size] 
+        # try:
+        #     # According to the payload header specification
+        #     command_header = struct.pack("<HH", command_id, len(payload))
 
-            _, _ = win32file.WriteFile(self.engine_handle, command_header + payload)
-            _, rsp = win32file.ReadFile(self.engine_handle, 1)
+        #     # for b in command_header: print(b)
 
-            if int.from_bytes(rsp, "little") != ACK:
-                self.send_command(command_id, payload, attempt + 1) 
-        except pywintypes.error as e:
-            logger.error(f"Could not send {COMMAND_STR_B[command_id]} command! ERROR CODE: {e.args[0]}")
-            return -1
-    
-        return 0
+        #     _, _ = win32file.WriteFile(self.engine_handle, command_header + payload)
+        #     _, rsp = win32file.ReadFile(self.engine_handle, 1)
+
+        #     if int.from_bytes(rsp, "little") != ACK:
+        #         self.send_command(command_id, payload, attempt + 1) 
+        # except pywintypes.error as e:
+        #     logger.error(f"Could not send {COMMAND_STR_B[command_id]} command! ERROR CODE: {e.args[0]}")
+        #     return -1
 
 
-    def recv_response(self) -> bytearray: 
-        try:
-            _, rsp = win32file.ReadFile(self.engine_handle, BUF_LEN)
+    # def recv_response(self) -> bytearray: 
+    #     try:
+    #         _, rsp = win32file.ReadFile(self.engine_handle, BUF_LEN)
 
-            _, _ = win32file.WriteFile(self.engine_handle, ACK.to_bytes(1))
+    #         _, _ = win32file.WriteFile(self.engine_handle, ACK.to_bytes(1))
 
-            return rsp
-        except pywintypes.error as e:
-            logger.error(f"Could not receive response! ERROR CODE: {e.args[0]}")
+    #         return rsp
+    #     except pywintypes.error as e:
+    #         logger.error(f"Could not receive response! ERROR CODE: {e.args[0]}")
         

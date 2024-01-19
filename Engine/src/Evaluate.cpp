@@ -1,49 +1,46 @@
 #include "Evaluate.h"
 
-extern int search_depth;
+// STATIC ARRAYS
 
-int Evaluate(Position& position, int depth) {
+static const int white_piece_value[NPIECE_TYPES] = {100, 300, 320, 330, 900, 20000};
+static const int black_piece_value[NPIECE_TYPES] = {-100, -300, -320, -330, -900, -20000};
+
+static const int mvv_lva_lookup[NPIECE_TYPES][NPIECE_TYPES] = {
+    /*           PAWN  KNIGHT BISHOP ROOK QUEEN KING */
+    /* PAWN */ {105, 205, 225, 235, 805, 905},
+    /* KNIGHT */ {104, 204, 224, 234, 804, 904},
+    /* BISHOP */ {103, 203, 223, 233, 803, 903},
+    /* ROOK */ {102, 202, 222, 232, 802, 902},
+    /* QUEEN  */ {101, 201, 221, 231, 801, 901},
+    /* KING  */ {100, 200, 220, 230, 800, 900},
+};
+
+int mvv_lva(const Move &m_, const Position &p_) {
+    if (m_.flags() != MoveFlags::CAPTURE) {
+        return 0;
+    }
+
+    PieceType attacker = type_of(p_.at(m_.from()));
+    PieceType victim = type_of(p_.at(m_.to()));
+
+    return mvv_lva_lookup[attacker][victim];
+}
+
+int Evaluate(Position& position, int depth, int search_depth) {
     int score = 0;
 
-    /*switch (C) {
-    case WHITE: {
-        if (position.checkmate<WHITE>()) {
-            return (SHRT_MIN / 2);
-        }
-        if (position.in_check<WHITE>()) {
-            score += -2000;
-        }
-        if (position.stalemate<WHITE>()) {
-            return 0;
-        }
-        break;
-    }
-    case BLACK: {
-        if (position.checkmate<BLACK>()) {
-            return (SHRT_MIN / 2);
-        }
-        if (position.in_check<BLACK>()) {
-            score += -2000;
-        }
-        if (position.stalemate<BLACK>()) {
-            return 0;
-        }
-        break;
-    }
-    }*/
-
     if (position.checkmate<WHITE>()) {
-        return (SHRT_MIN / 2) * ((float)(depth + 1) / search_depth);
+        return (SHRT_MIN) * ((float)(depth + 1) / search_depth);
     }
     if (position.checkmate<BLACK>()) {
-        return (SHRT_MAX / 2) * ((float)(depth + 1) / search_depth);
+        return (SHRT_MAX) * ((float)(depth + 1) / search_depth);
     }
 
     if (position.in_check<WHITE>()) {
-        score += -2000;
+        score += -100;
     }
     if (position.in_check<BLACK>()) {
-        score += 2000;
+        score += 100;
     }
 
     if (position.stalemate<WHITE>()) {
@@ -53,67 +50,77 @@ int Evaluate(Position& position, int depth) {
         return 0;
     }
 
-    Piece* pieces = position.getPieces();
+    for (int p = 0; p < NPIECE_TYPES; ++p)
+    {
+        Bitboard white_piece_bb = position.bitboard_of(make_piece(WHITE, (PieceType)p));
+        Bitboard black_piece_bb = position.bitboard_of(make_piece(BLACK, (PieceType)p));
 
-    for (uint8_t i = 0; i < NSQUARES; i++) {
-        switch (pieces[i])
+        // TODO: add position dependent scores (e.g. having bishops and knights move towards the centre increases scores)
+
+        while (white_piece_bb)
         {
-        case NO_PIECE:
-            break;
-        case WHITE_PAWN:
-            score += 100;
-            score += white_pawn_table[i];
-            break;
-        case WHITE_KNIGHT:
-            score += 320;
-            score += knight_table[i];
-            break;
-        case WHITE_BISHOP:
-            score += 330;
-            score += white_bishop_table[i];
-            break;
-        case WHITE_ROOK:
-            score += 500;
-            score += white_rook_table[i];
-            break;
-        case WHITE_QUEEN:
-            score += 900;
-            score += white_queen_table[i];
-            break;
-        case WHITE_KING:
-            /*if (position.ply() > 30)
-                score += white_king_mg_table[i];
-            if (position.ply() > 50)
-                score += white_king_eg_table[i];*/
-            break;
-        case BLACK_PAWN:
-            score -= 100;
-            score -= black_pawn_table[i];
-            break;
-        case BLACK_KNIGHT:
-            score -= 320;
-            score -= knight_table[i];
-            break;
-        case BLACK_BISHOP:
-            score -= 330;
-            score -= black_bishop_table[i];
-            break;
-        case BLACK_ROOK:
-            score -= 500;
-            score -= black_rook_table[i];
-            break;
-        case BLACK_QUEEN:
-            score -= 900;
-            score -= black_queen_table[i];
-            break;
-        case BLACK_KING:
-            /*if (position.ply() > 30)
-                score -= black_king_mg_table[i];
-            if (position.ply() > 50)
-                score -= black_king_eg_table[i];*/
-            break;
+            pop_lsb(&white_piece_bb);
+            score += white_piece_value[p];
+        }
+
+        while (black_piece_bb)
+        {
+            pop_lsb(&black_piece_bb);
+            score += black_piece_value[p];
         }
     }
+
+    // Piece* pieces = position.getPieces();
+
+    
+
+    // for (uint8_t i = 0; i < NSQUARES; i++) {
+    //     switch (pieces[i])
+    //     {
+    //         case NO_PIECE:
+    //             break;
+    //         case WHITE_PAWN:
+    //             score += 100;
+    //             score += white_pawn_table[i];
+    //             break;
+    //         case WHITE_KNIGHT:
+    //             score += 320;
+    //             score += knight_table[i];
+    //             break;
+    //         case WHITE_BISHOP:
+    //             score += 330;
+    //             score += white_bishop_table[i];
+    //             break;
+    //         case WHITE_ROOK:
+    //             score += 500;
+    //             score += white_rook_table[i];
+    //             break;
+    //         case WHITE_QUEEN:
+    //             score += 900;
+    //             score += white_queen_table[i];
+    //             break;
+    //         case BLACK_PAWN:
+    //             score -= 100;
+    //             score -= black_pawn_table[i];
+    //             break;
+    //         case BLACK_KNIGHT:
+    //             score -= 320;
+    //             score -= knight_table[i];
+    //             break;
+    //         case BLACK_BISHOP:
+    //             score -= 330;
+    //             score -= black_bishop_table[i];
+    //             break;
+    //         case BLACK_ROOK:
+    //             score -= 500;
+    //             score -= black_rook_table[i];
+    //             break;
+    //         case BLACK_QUEEN:
+    //             score -= 900;
+    //             score -= black_queen_table[i];
+    //             break;
+    //     }
+    // }
 
     return score;
 }
@@ -317,6 +324,10 @@ int middle_game_eval(Position& b) {
     }
     return eval;
 }
+
+// bool move_sorting_criterion(Move& a, Move& b) {
+//     return a.flags() > b.flags();
+// }
 
 int newEvaluate(Position& eB) {
     return 0;

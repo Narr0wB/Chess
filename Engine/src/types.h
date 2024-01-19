@@ -196,6 +196,10 @@ public:
 			create_square(File(move[2] - 'a'), Rank(move[3] - '1'));
 	}
 
+	Move(Move&& m) = default;
+	Move(const Move& m) : move(m.move) {};
+	Move(Move& m) : move(m.move) {}
+
 	inline Square to() const { return Square(move & 0x3f); }
 	inline Square from() const { return Square((move >> 6) & 0x3f); }
 	inline int to_from() const { return move & 0xffff; }
@@ -211,6 +215,8 @@ public:
 	bool operator==(Move a) const { return to_from() == a.to_from(); }
 	bool operator!=(Move a) const { return to_from() != a.to_from(); }
 };
+
+#define NO_MOVE Move(0)
 
 //Adds, to the move pointer all moves of the form (from, s), where s is a square in the bitboard to
 template<MoveFlags F = QUIET>

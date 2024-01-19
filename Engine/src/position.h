@@ -21,6 +21,7 @@ copies or substantial portions of the Software.
 #include <string>
 #include "tables.h"
 #include <utility>
+#include <algorithm>
 
 //A psuedorandom number generator
 //Source: Stockfish
@@ -433,9 +434,6 @@ bool Position::stalemate() const
 
 	Square s;
 
-	Bitboard temp_checkers = attacks<KNIGHT>(our_king, all) & bitboard_of(Them, KNIGHT)
-		| pawn_attacks<Us>(our_king) & bitboard_of(Them, PAWN);
-
 	Bitboard candidates = attacks<ROOK>(our_king, them_bb) & their_orth_sliders
 		| attacks<BISHOP>(our_king, them_bb) & their_diag_sliders;
 
@@ -446,22 +444,15 @@ bool Position::stalemate() const
 
 		//Do the squares in between the enemy slider and our king contain any of our pieces?
 		//If not, add the slider to the checker bitboard
-		if (b1 == 0) temp_checkers ^= SQUARE_BB[s];
 		//If there is only one of our pieces between them, add our piece to the pinned bitboard 
-		else if ((b1 & b1 - 1) == 0) temp_pinned ^= b1;
+		if ((b1 & b1 - 1) == 0) temp_pinned ^= b1;
 	}
-
-	// If it is a double check and we cannot move the king, then it is checkmate
-	if (sparse_pop_count(temp_checkers) == 2) { return 1; }
 
 	Bitboard not_pinned = ~temp_pinned;
 
-	Square checker_square = bsf(temp_checkers);
+	Bitboard quiet_mask = ~all;
+	Bitboard capture_mask = them_bb;
 
-	// If we can capture the attacking square, then it is not checkmate
-	if (attackers_from<Us>(checker_square, all) & not_pinned) { /*std::cout << "FAILED ATTACKABLE ATTACKER";*/ return 0; }
-
-	Bitboard quiet_mask = SQUARES_BETWEEN_BB[our_king][checker_square];
 
 	//For each ally piece, add all of its attacks to the b2 bitboard
 	b2 = pawn_attacks<Us>(bitboard_of(Us, PAWN) & not_pinned);
@@ -475,20 +466,7 @@ bool Position::stalemate() const
 	b1 = our_orth_sliders & not_pinned;
 	while (b1) b2 |= attacks<ROOK>(pop_lsb(&b1), all);
 
-
-	if (quiet_mask & b2) { /*std::cout << "FAILED QUIET BLOCK";*/ return 0; }
-
-	if (board[checker_square] == make_piece(Them, PAWN)) {
-		//If the checker is a pawn, we must check for e.p. moves that can capture it
-			//This evaluates to true if the checking piece is the one which just double pushed
-		if (checkers == shift<relative_dir<Us>(SOUTH)>(SQUARE_BB[history[game_ply].epsq])) {
-			//b1 contains our pawns that can capture the checker e.p.
-			b1 = pawn_attacks<Them>(history[game_ply].epsq) & bitboard_of(Us, PAWN) & not_pinned;
-
-			// If there is an e.p. move, then it is not checkmate
-			if (b1) { /*std::cout << "FAILED EN PASSANT CAPTURE";*/ return 0; }
-		}
-	}
+	if (b2) { return 0; }
 
 	return 1;
 }
@@ -1023,8 +1001,6 @@ Move* Position::generate_legals(Move* list) {
 template<Color Us>
 inline Move* Position::generate_legals_for(Square sq, Move* list)
 {
-	/*std::cout << sq << std::endl;
-	std::cout << fen() << std::endl;*/
 	constexpr Color Them = ~Us;
 
 	const Bitboard us_bb = all_pieces<Us>();
@@ -1365,8 +1341,8 @@ public:
 	explicit MoveList(Position& p) : last(p.generate_legals<Us>(list)) {}
 	explicit MoveList(Position& p, Square sq) : last(p.generate_legals_for<Us>(sq, list)) {}
 
-	const Move* begin() const { return list; }
-	const Move* end() const { return last; }
+	Move* begin() { return list; }
+	Move* end() { return last; }
 	size_t size() const { return last - list; }
 private:
 	Move list[218];

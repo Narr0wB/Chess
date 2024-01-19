@@ -10,6 +10,8 @@ import atexit
 
 from Event import *
 from Utilities import *
+from EngineAPI import * 
+from Move import *
 from pygame import mixer
 
 import win32file, pywintypes
@@ -22,6 +24,7 @@ mixer.init()
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 CHESS_START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+initialize_engine_dll("build/Engine.dll")
 
 # BUGGED POSITION: 2kr1bnr/ppp1pppp/4b3/8/1nP2B2/N7/PPK1PPPP/R4BNR w - - 0 1
 
@@ -37,15 +40,15 @@ WHITE = 0
 BLACK = 1
 
 # -------------------------------------------------------------------------------
-NONE = 0x00
-SET = 0x01
-MOVE = 0x02
-UNDO = 0x03
-MOVEREQ = 0x04
-GENMOVES = 0x05
-INCHECK = 0x06
-FEN = 0x07
-EXIT = 0x08
+# NONE = 0x00
+# SET = 0x01
+# MOVE = 0x02
+# UNDO = 0x03
+# MOVEREQ = 0x04
+# GENMOVES = 0x05
+# INCHECK = 0x06
+# FEN = 0x07
+# EXIT = 0x08
 
 # -------------------------------------------------------------------------------
 SQSTR = {
@@ -60,33 +63,33 @@ SQSTR = {
 	"None": 64
 }
 
-MOVE_TYPESTR_B = [
-	"", "", " O-O", " O-O-O", " N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)", " (capture)", "", " e.p.", "",
-	" N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)"
-]
+# MOVE_TYPESTR_B = [
+# 	"", "", " O-O", " O-O-O", " N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)", " (capture)", "", " e.p.", "",
+# 	" N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)"
+# ]
 
-MOVE_FLAGSTR = [
-    "", "", "OO", "OOO", "", "", "", "", "x", "", "ep", "", "", "", "", ""
-]
+# MOVE_FLAGSTR = [
+#     "", "", "OO", "OOO", "", "", "", "", "x", "", "ep", "", "", "", "", ""
+# ]
 
 # -------------------------------------------------------------------------------
-QUIET = 0b0000
-DOUBLE_PUSH = 0b0001
-OO = 0b0010
-OOO = 0b0011
-CAPTURE = 0b1000
-CAPTURES = 0b1111
-EN_PASSANT = 0b1010
-PROMOTIONS = 0b0111
-PROMOTION_CAPTURES = 0b1100
-PR_KNIGHT = 0b0100
-PR_BISHOP = 0b0101
-PR_ROOK = 0b0110
-PR_QUEEN = 0b0111
-PC_KNIGHT = 0b1100
-PC_BISHOP = 0b1101
-PC_ROOK = 0b1110
-PC_QUEEN = 0b1111
+# QUIET = 0b0000
+# DOUBLE_PUSH = 0b0001
+# OO = 0b0010
+# OOO = 0b0011
+# CAPTURE = 0b1000
+# CAPTURES = 0b1111
+# EN_PASSANT = 0b1010
+# PROMOTIONS = 0b0111
+# PROMOTION_CAPTURES = 0b1100
+# PR_KNIGHT = 0b0100
+# PR_BISHOP = 0b0101
+# PR_ROOK = 0b0110
+# PR_QUEEN = 0b0111
+# PC_KNIGHT = 0b1100
+# PC_BISHOP = 0b1101
+# PC_ROOK = 0b1110
+# PC_QUEEN = 0b1111
 
 NOMOVE = 0xFF
 
@@ -192,58 +195,58 @@ class Piece:
         self.fentype = pieceToFen[(pieceType, color)]
         self.uniqueCode = 0
 
-class Move:
-    def __init__(self, move_internal: int = 0, from_sq: int = 0, to_sq: int = 0, flags: int = 0):
-        if (move_internal):
-            self.move = move_internal
-        else:
-            self.move = int((flags << 12) | (from_sq << 6) | to_sq);
+# class Move:
+#     def __init__(self, move_internal: int = 0, from_sq: int = 0, to_sq: int = 0, flags: int = 0):
+#         if (move_internal):
+#             self.move = move_internal
+#         else:
+#             self.move = int((flags << 12) | (from_sq << 6) | to_sq);
     
-    def getFrom(self):
-        return (self.move >> 6) & 0x3f
+#     def getFrom(self):
+#         return (self.move >> 6) & 0x3f
 
-    def getTo(self):
-        return self.move & 0x3f
+#     def getTo(self):
+#         return self.move & 0x3f
     
-    def getFlags(self):
-        return self.move >> 12
+#     def getFlags(self):
+#         return self.move >> 12
     
-    def setFlags(self, flags: int):
-        self.move &= (0b111111 << 6 | 0b111111)
-        self.move |= (flags << 12)
+#     def setFlags(self, flags: int):
+#         self.move &= (0b111111 << 6 | 0b111111)
+#         self.move |= (flags << 12)
     
-    def toBytes(self):
-        return self.move.to_bytes(2, "little")
+#     def toBytes(self):
+#         return self.move.to_bytes(2, "little")
     
-    def toString(self):
-        return SQSTR[self.getFrom()] + SQSTR[self.getTo()] + MOVE_TYPESTR_B[self.getFlags()]
+#     def toString(self):
+#         return SQSTR[self.getFrom()] + SQSTR[self.getTo()] + MOVE_TYPESTR_B[self.getFlags()]
     
-    def getInternal(self):
-        return self.move
+#     def getInternal(self):
+#         return self.move
     
-    def __str__(self):
-        return_string = ""
+#     def __str__(self):
+#         return_string = ""
 
-        for square_string, square in SQSTR.items():
-            if square == self.getFrom():
-                return_string += square_string
+#         for square_string, square in SQSTR.items():
+#             if square == self.getFrom():
+#                 return_string += square_string
 
-        for square_string, square in SQSTR.items():    
-            if square == self.getTo():
-                return_string += square_string 
+#         for square_string, square in SQSTR.items():    
+#             if square == self.getTo():
+#                 return_string += square_string 
 
-        return return_string + MOVE_TYPESTR_B[self.getFlags()]
+#         return return_string + MOVE_TYPESTR_B[self.getFlags()]
 
-def arrayU16toMoves(buffer: bytearray) -> list:
-    moves = []
+# def arrayU16toMoves(buffer: bytearray) -> list:
+#     moves = []
 
-    if int.from_bytes(buffer[:2], "little") == 0:
-            return moves
+#     if int.from_bytes(buffer[:2], "little") == 0:
+#             return moves
 
-    for i in range(0, len(buffer), 2):
-        moves.append(Move(int.from_bytes(buffer[i:i + 2], "little")))
+#     for i in range(0, len(buffer), 2):
+#         moves.append(Move(int.from_bytes(buffer[i:i + 2], "little")))
 
-    return moves
+#     return moves
 
 
 def sleep(ms: float):
@@ -309,15 +312,14 @@ class Board():
 
         
         self.selected_piece = ()
-        self.enpassant = []
         self.moves = []
         self.poppedEnpassant = []
         self.use_ai = ai
-        self.ai_level = 4
-        self.engine_handle = 0
+        self.ai_level = 5
         self.game_ply = 0
         self.start_player = WHITE
         self.current_player = self.start_player
+        self.engine = Engine(debug_console=True)
 
         self.board = {}
         self.move_log = []
@@ -381,7 +383,6 @@ class Board():
             loading_gif.seek(i)
             self.loading_animation.append(ImageTk.PhotoImage(loading_gif.resize((18, 18), resample=Resampling.NEAREST)))
 
-        self.initializeEngine()
         self.loadBoard(start)
         
     def onClose(self):
@@ -390,52 +391,51 @@ class Board():
         except:
             pass
 
-        self.engineSendCommand(EXIT)
-        win32file.CloseHandle(self.engine_handle)
+        self.engine.exit()
 
         self.should_close = True
 
-    def initializeEngine(self):
-        #subprocess.Popen([f"{dir_path}\\assets\\Engine.exe"])
-        time.sleep(0.1)
+    # def initializeEngine(self):
+    #     #subprocess.Popen([f"{dir_path}\\assets\\Engine.exe"])
+    #     time.sleep(0.1)
 
-        try:
-            # Create the pipe for communication
-            self.engine_handle = win32file.CreateFile(r"\\.\\pipe\\chess", 
-                                                    win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-                                                    0,
-                                                    None,
-                                                    win32file.OPEN_EXISTING,
-                                                    0,
-                                                    None)
+    #     try:
+    #         # Create the pipe for communication
+    #         self.engine_handle = win32file.CreateFile(r"\\.\\pipe\\chess", 
+    #                                                 win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+    #                                                 0,
+    #                                                 None,
+    #                                                 win32file.OPEN_EXISTING,
+    #                                                 0,
+    #                                                 None)
             
-        except pywintypes.error as e:
-            print(e)
-            if e.args[0] == 2:
-                print("[ERROR] No pipe available")
-            elif e.args[0] == 109:
-                print("[ERROR] Could not open pipe, exiting")
-                exit(0) 
+    #     except pywintypes.error as e:
+    #         print(e)
+    #         if e.args[0] == 2:
+    #             print("[ERROR] No pipe available")
+    #         elif e.args[0] == 109:
+    #             print("[ERROR] Could not open pipe, exiting")
+    #             exit(0) 
 
-    def engineSendCommand(self, command_type: int, command_payload: bytearray = None, wait: bool = True) -> bytearray:
-        if command_payload == None:
-            command_payload = bytearray()
+    # def engineSendCommand(self, command_type: int, command_payload: bytearray = None, wait: bool = True) -> bytearray:
+    #     if command_payload == None:
+    #         command_payload = bytearray()
 
-        _, _ = win32file.WriteFile(self.engine_handle, command_type.to_bytes(1) + command_payload) 
+    #     _, _ = win32file.WriteFile(self.engine_handle, command_type.to_bytes(1) + command_payload) 
 
-        if self.debug:
-            pass
-            #print("Sent the engine", command_type, command_payload)
+    #     if self.debug:
+    #         pass
+    #         #print("Sent the engine", command_type, command_payload)
 
-        if wait:
-            res = win32file.ReadFile(self.engine_handle, 1024)
-            if self.debug:
-                pass
-                #print("Received from the engine", res[1])
+    #     if wait:
+    #         res = win32file.ReadFile(self.engine_handle, 1024)
+    #         if self.debug:
+    #             pass
+    #             #print("Received from the engine", res[1])
 
-            return res[1]
+    #         return res[1]
 
-        return bytearray()
+    #     return bytearray()
 
     def mainloop(self):
         while not self.should_close:
@@ -514,9 +514,9 @@ class Board():
         self.canvas.unbind("<Button-1>")
         self.canvas.unbind("<B1-Motion>")
 
-        self.engineSendCommand(MOVEREQ, bytearray([self.ai_level, self.current_player]), wait = False)
+        #self.engineSendCommand(MOVEREQ, bytearray([self.ai_level, self.current_player]), wait = False)
 
-        engine_move_thread = threading.Thread(target=self.moveAIThread, args=(self.handler, self.engine_handle,))
+        engine_move_thread = threading.Thread(target=self.moveAIThread, args=())
         engine_move_thread.start()
 
         self._control_variables["engine_calculating"] = True
@@ -539,22 +539,20 @@ class Board():
         
         self.canvas.after(140, self.playCalculatingAnimation, idx)
 
-    def moveAIThread(self, handler: Handler, engine_pipe_handle):
-        res = win32file.ReadFile(engine_pipe_handle, 1024)
+    def moveAIThread(self):
+        #res = win32file.ReadFile(engine_pipe_handle, 1024)
+        res = self.engine.ai_move(self.ai_level, self.current_player)
+        print(res)
 
-        handler.queuePush(EngineMoveEvent(res[1]))
+        self.handler.queuePush(EngineMoveEvent(res))
 
     def moveAI(self, event: EngineMoveEvent):
         self._control_variables["engine_calculating"] = False
 
-        
-        move_code = event.move_code
-        move = Move(int.from_bytes(move_code, "little"))
-
         if self.debug:
-            print("The engine played", move)
+            print("The engine played", event.move)
 
-        self.playMove(move)
+        self.playMove(event.move)
 
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
@@ -575,7 +573,7 @@ class Board():
             self.resetSelectedMovesColor([move.getTo() for move in self.moves])
             self.resetSelectedColor()
 
-        self.engineSendCommand(UNDO)
+        self.engine.undo()
         self.current_player ^= 1
         
 
@@ -672,13 +670,13 @@ class Board():
     def loadBoard(self, fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq"):
         self.board.clear()
         self.moves.clear()
-        self.enpassant.clear()
-        self.selected_piece = None
         self.move_log.clear()
-        self._control_variables = {"engine_calculating": False, "movelog_count": 2, "movelog_list": [], "drag_calls": 0, "restore": False, "promotion_sq": None}
-        self.promotion_ui = False
 
-        self.engineSendCommand(SET, fen.encode())
+        self.selected_piece = None
+        self.promotion_ui = False
+        self._control_variables = {"engine_calculating": False, "movelog_count": 2, "movelog_list": [], "drag_calls": 0, "restore": False, "promotion_sq": None}
+
+        self.engine.set(fen)
         self.initFromFen(fen)
         
         self.drawBoard()
@@ -715,9 +713,9 @@ class Board():
 
     # Current board to FEN notation
     def toFen(self):
-        fen_str = self.engineSendCommand(FEN)
+        fen_str = self.engine.fen()
 
-        return fen_str.decode()
+        return fen_str
 
     # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
     def addpiece(self, piece: Piece, row: int, column: int):
@@ -816,7 +814,7 @@ class Board():
                 mixer.music.load(f"{dir_path}\\assets\\move-self.mp3")
                 mixer.music.play() 
 
-        self.engineSendCommand(MOVE, self.current_player.to_bytes(1) + move.toBytes())
+        self.engine.move(self.current_player, move)
 
         self.current_player ^= 1
         self.handler.queuePush(UpdateLogEvent(self.board[to_sq].fentype, move, self.game_ply))
@@ -1001,23 +999,20 @@ class Board():
                 self.selected_piece = None
 
     def generateAllLegalMoves(self, side_color: int):
-        move_codes = self.engineSendCommand(GENMOVES, (100 + side_color).to_bytes(1))
+        move_codes = self.engine.generate_moves((100 + side_color))
 
         moves = arrayU16toMoves(move_codes)
 
         return moves
 
     def inCheck(self, color: int) -> bool:
-        return int(self.engineSendCommand(INCHECK, color))              
+        return self.engine.in_check(color)           
 
     def generateLegalMoves(self, square: int) -> list:
-        moves = []
-
         if square > 63 or square < 0:
-            return moves
+            return []
 
-        move_codes = self.engineSendCommand(GENMOVES, square.to_bytes(1))
-        moves = arrayU16toMoves(move_codes)
+        moves = self.engine.generate_moves(square)
         
         return moves
     
@@ -1084,5 +1079,6 @@ class Board():
         
 if __name__ == "__main__":
     #start="rnbqkbnr/1pppppPp/8/8/8/8/PpPPPPP1/RNBQKBNR w KQkq"
-    board = Board(debug = True, start_player = WHITE, ai = True);
+    #start="rnbqkbnr/pppp1ppp/4p3/8/1P6/N1P5/P2PPPPP/R1BQKBNR w KQkq"
+    board = Board(start="rnbq1knr/ppppppb1/7p/3PP3/Q1N3P1/2PB1N2/PP1B1P1P/R4RK1 w", debug = True, start_player = WHITE, ai = True);
     board.mainloop()

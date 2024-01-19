@@ -1,10 +1,15 @@
 from EngineAPI import *
 
-if __name__ == "__main__":   
-    engine1 = Engine("Engine/x64/Release/Engine.exe")
-    engine2 = Engine("Engine/x64/Release/Engine.exe")
+if __name__ == "__main__":
+    initialize_engine_dll("build/Engine.dll")
+
+    engine1 = Engine()
+    engine2 = Engine()
 
     # engine1.set("8/5p2/1p6/2k5/5Rp1/K5P1/q5r1/8 w - - 2 2") "Engine/x64/Release/Engine.exe" "8/8/8/8/3B4/2Q5/8/3k2K1 w - -"
+
+    # THE SOLUTION IS TO REMOVE FROM THE EVALUABLE MOVES THE LAST PLAYED MOVE
+    # r1bqkb1r/pppn1ppp/3p1n2/4p3/3P4/2N1P2P/PPP2PP1/R1BQKBNR w KQkq - 1 5
 
     # print(engine1.checkmate(WHITE))
     engine1.set(START)
@@ -17,6 +22,7 @@ if __name__ == "__main__":
     flag = 0
 
     while ( condition := (not engine1.checkmate(engine1_color)) and (not engine2.checkmate(engine2_color)) ):
+        #print(engine1.fen())
         print("Engine v0 to move")
         move = engine1.ai_move(4, engine1_color)
 
@@ -45,9 +51,6 @@ if __name__ == "__main__":
     print(f"{COLOR_STR_B[engine1_color] if engine2.checkmate(engine2_color) else COLOR_STR_B[engine2_color]} won!")
     print(engine1.fen())
     print(engine2.fen())
-    
-
-    input()
 
     engine1.exit()
     engine2.exit()

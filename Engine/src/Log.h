@@ -4,6 +4,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/fmt/ostr.h>
 #include <csignal>
 
 #define LERROR 0
@@ -21,8 +22,8 @@ class Log {
 };
 
 #define LOG_ERROR(...)  do { Log::GetLogger()->error(__VA_ARGS__); exit(EXIT_FAILURE); } while (0)
-#define LOG_WARN(...)   Log::GetLogger()->warn(__VA_ARGS__)
-#define LOG_INFO(...)   Log::GetLogger()->info(__VA_ARGS__)
+#define LOG_WARN(...)   do { Log::GetLogger()->warn(__VA_ARGS__); } while (0)
+#define LOG_INFO(...)   do { Log::GetLogger()->info(__VA_ARGS__); } while (0)
 
 // #define ASSERT(condition) do  { if (!(condition)) {LOG_ERROR("ASSERTION FAILED! {} {}", __FILE__, __LINE__);}; } while (0)
 

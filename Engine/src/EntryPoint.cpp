@@ -4,11 +4,6 @@
 #include "Evaluate.h"
 #include "Engine.h"
 
-
-#define START_POSITION "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/ w KQkq"
-#define DEBUG_POSITION "rnb2b2/2p1k1p1/1p1q4/3p4/P7/8/P4PPP/RNB1KBNR w KQ - 0 9"
-
-
 /*
 	Table of commands:
 
@@ -21,48 +16,91 @@
 	CHECKMATE <color>							---> Check if side <color> is in checkmate
 	COLOR <color>								---> Return the current side to play
 	EXIT										---> Exit the program
+
 */
 
-int main(int argc, char** argv) {
-	initialise_all_databases();
-	zobrist::initialise_zobrist_keys();
-	Log::Init();
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+// int main(void) {
+// 	int ul_reason_for_call = 1;
 
-	/*Position p;
-	Position::set("8/8/8/8/3B4/2Q5/6K1/3k4 b - -", p);
-	std::cout << p << std::endl;*/
-	// "8/5p2/1p6/2k5/K5p1/6P1/2q3r1/8 w - - 3 3"
+	switch (ul_reason_for_call)
+    {
+        case DLL_PROCESS_ATTACH:
+			//std::cout << "Attached (Process)" << std::endl;
+			Log::Init();
+			initialise_all_databases();
+			zobrist::initialise_zobrist_keys();
+			break;
+        case DLL_THREAD_ATTACH:
+			//std::cout << "Attached (Thread)" << std::endl;
+			break;
+        case DLL_THREAD_DETACH:
+			//std::cout << "Detached (Thread)" << std::endl;
+			break;
+        case DLL_PROCESS_DETACH:
+			//std::cout << "Detached (Process)" << std::endl;
+			break;
+    }
 
-	/*int s = 0;
 	
-	auto start = std::chrono::high_resolution_clock::now();
-	for (int i = 0; i < 10e6; ++i) {
-		s = Evaluate(p);
-	}
-	auto stop = std::chrono::high_resolution_clock::now();
+   
+	// Position p;
+	// Position::set("r3kb1Q/pp3p1p/2p5/8/2b1q3/Pn6/5PPP/1R4K1 w q", p);
 
-	auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start) / 10e6;
-	std::cout << duration.count() << std::endl;*/
-	//std::cout << p.stalemate<WHITE>() << std::endl;
 
-	/*Move m = findBestMove<BLACK>(p, 4);
-	std::cout << m << std::endl;
-	p.play<BLACK>(m);
+	// MoveList<WHITE> mL(p, Square::h8);
+	// Move m = Move(Square::h8, Square::h7, MoveFlags::CAPTURE);
+	// const int factor = 10e6;
+	// int sc = 0;
 
-	m = findBestMove<WHITE>(p, 4);
-	std::cout << m << std::endl;
-	p.play<WHITE>(m);*/
+	// auto start = std::chrono::high_resolution_clock::now();
+	// for (int i = 0; i < factor; ++i) {
+	// 	sc = mvv_lva(m, p);
+	// }
+	// auto stop = std::chrono::high_resolution_clock::now();
 
-	if (argc < 2) {
-		printf("[ERROR] Insufficient arguments!\nUSAGE: engine [PIPE_KEY]");
-		exit(EXIT_FAILURE);
-	}
+	// auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+	// std::cout << (float) duration.count() / factor << std::endl;
+	// std::cout << (float) ( - start.time_since_epoch().count() + stop.time_since_epoch().count() ) / (1) << std::endl;
+	// std::cout << sc << std::endl;
 
-	auto app = Engine::CreateApplication(argv[1]);
+	/*Move m = findBestMove<WHITE>(p, 4);
+	std::cout << m << std::endl;*/
+	/*const Color PLAYER1 = WHITE;
+	const Color PLAYER2 = BLACK;
 
-	app->Run();
+	while (TRUE) {
+		Move m = findBestMove<PLAYER1>(p, 4);
+		std::cout << "Engine 0.0 played: " << m << std::endl;
+		p.play<PLAYER1>(m);
+
+		std::cout << p.fen() << std::endl;
+		if (p.stalemate<PLAYER1>() or p.stalemate<PLAYER2>()) {
+			std::cout << "STALEMATE" << std::endl;
+			break;
+		}
+
+		if (p.checkmate<PLAYER1>() or p.checkmate<PLAYER2>()) {
+			std::cout << "CHECKMATE" << std::endl;
+			break;
+		}
+
+		m = findBestMove<PLAYER2>(p, 4);
+		std::cout << "Engine 0.1 played: " << m << std::endl;
+		p.play<PLAYER2>(m);
+
+
+	}*/
+
+	// if (argc < 2) {
+	// 	printf("[ERROR] Insufficient arguments!\nUSAGE: engine [PIPE_KEY]");
+	// 	exit(EXIT_FAILURE);
+	// }
+
+	// auto app = Engine::CreateApplication(argv[1]);
+
+	// app->Run();
 	
-	delete app;
-
-	return 0;
+	// delete app;
+	return TRUE;
 }
