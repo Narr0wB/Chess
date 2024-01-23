@@ -63,7 +63,7 @@ namespace Engine {
 	#define BAD_RESPONSE 	Engine::Response{2, {0xDE, 0xAD}}
 	#define WRITE_MOVELIST(move_list, resp) \
 	{\
-		resp.payload_size =  move_list.size() * 2;\
+		resp.payload_size =  move_list.size() * sizeof(Move);\
 		std::memcpy(resp.payload, (void*)move_list.begin(), resp.payload_size);\
 	};
 

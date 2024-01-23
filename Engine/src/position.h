@@ -22,6 +22,7 @@ copies or substantial portions of the Software.
 #include "tables.h"
 #include <utility>
 #include <algorithm>
+#include "Log.h"
 
 //A psuedorandom number generator
 //Source: Stockfish
@@ -846,7 +847,7 @@ Move* Position::generate_legals(Move* list) {
 		//2. No piece is attacking between the the rook and the king
 		//3. The king is not in check
 		if (!((history[game_ply].entry & oo_mask<Us>()) | ((all | danger) & oo_blockers_mask<Us>())))
-			*list++ = Us == WHITE ? Move(e1, h1, OO) : Move(e8, h8, OO);
+			*list++ = Us == WHITE ? Move(e1, h1, OO) : Move(e8, g8, OO);
 		if (!((history[game_ply].entry & ooo_mask<Us>()) |
 			((all | (danger & ~ignore_ooo_danger<Us>())) & ooo_blockers_mask<Us>())))
 			*list++ = Us == WHITE ? Move(e1, c1, OOO) : Move(e8, c8, OOO);
@@ -1337,14 +1338,15 @@ inline Move* Position::generate_legals_for(Square sq, Move* list)
 //generate_legals() function directly. It can be iterated over.
 template<Color Us>
 class MoveList {
-public:
-	explicit MoveList(Position& p) : last(p.generate_legals<Us>(list)) {}
-	explicit MoveList(Position& p, Square sq) : last(p.generate_legals_for<Us>(sq, list)) {}
+	private:
+		Move list[218];
+		Move *last;
 
-	Move* begin() { return list; }
-	Move* end() { return last; }
-	size_t size() const { return last - list; }
-private:
-	Move list[218];
-	Move *last;
+	public:
+		explicit MoveList(Position& p) : last(p.generate_legals<Us>(list)) {}
+		explicit MoveList(Position& p, Square sq) : last(p.generate_legals_for<Us>(sq, list)) {}
+
+		Move* begin() { return list; }
+		Move* end() { return last; }
+		size_t size() const { return last - list; }
 };

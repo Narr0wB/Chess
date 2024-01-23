@@ -77,25 +77,25 @@ namespace Engine {
 				u8 level = command.payload[0];
 				Color C = (Color)command.payload[1];
 
-				if (level > 6)
-					level = 6;
+				if (level > 20)
+					level = 20;
 
-				Move move;
+				SearchInfo s_info;
 
 				switch (C) {
 					case BLACK: {
-						move = findBestMove<BLACK>(m_Position, level);
+						s_info = search_best_move<BLACK>(m_Position, level);
 						break;
 					}
 					case WHITE: {
-						move = findBestMove<WHITE>(m_Position, level);
+						s_info = search_best_move<WHITE>(m_Position, level);
 						break;
 					}
 				}
 
-				if (m_Debug) { LOG_INFO("[{}] Searched {} positions", m_InstanceID, nodes_searched); }
+				if (m_Debug) { LOG_INFO("[{}] Searched {:L} total nodes in {:.1f}ms", m_InstanceID, s_info.total_nodes, s_info.search_duration_ms); }
 
-				uint16_t move_internal = move.to_from_flags();
+				uint16_t move_internal = s_info.best.to_from_flags();
 
 				Response resp;
 				resp.payload_size = sizeof(move_internal);

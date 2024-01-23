@@ -16,15 +16,19 @@
 typedef uint8_t TranspositionFlags;
 
 struct Transposition {
-    uint64_t hash;
-    TranspositionFlags flags;
+    Transposition(TranspositionFlags f, uint64_t h, uint8_t d, int sc, Move b) : 
+    flags(f), hash(h), depth(d), score(sc), best(b) {};
+    
+    Transposition() {};
 
-    int score;
+    TranspositionFlags flags;
+    uint64_t hash;
     uint8_t depth;
+    int score;
     Move best;
 };
 
-#define NO_HASH_ENTRY Transposition { 0, 0, NO_SCORE, 0, Move(0) }
+#define NO_HASH_ENTRY Transposition { FLAG_EMPTY, 0, 0, NO_SCORE, NO_MOVE }
 
 class TranspositionTable {
     private:

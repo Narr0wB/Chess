@@ -10,15 +10,13 @@ void TranspositionTable::push_position(Transposition t)
         entry = t;
         m_Size++;
     }
-
-
     else {
         // If the entry is not empty first check if its the same position
         if (entry.hash == t.hash) {
 
             // If the depth of the transposition (t) is higher
             // then replace entry with t
-            if (entry.depth < t.depth) {
+            if (t.depth > entry.depth) {
                 entry = t;
             }
         }
@@ -28,24 +26,23 @@ void TranspositionTable::push_position(Transposition t)
     }
 }
 
-Transposition TranspositionTable::probe_hash(uint64_t hash, int alpha, int beta, int depth)
-{
+Transposition TranspositionTable::probe_hash(uint64_t hash, int alpha, int beta, int depth) {
     Transposition position = m_DataArray[hash % m_Capacity];
 
     if (position.hash == hash) {
-        return position;
-        // if (position.depth >= depth) {
-        //     if (position.flags) {
-        //         return position;
-        //     }
+        if (position.depth >= depth) {
+            // If the position we found is an EXACT tranposistion, do not change the score, as we want to return it
 
-            /*if (position.flags == FLAG_ALPHA && position.score <= alpha) {
-                return alpha;
+            if (position.flags == FLAG_ALPHA && position.score <= alpha) {
+                position.score = alpha;
             }
 
             if (position.flags == FLAG_BETA && position.score >= beta) {
-                return beta;
-            }*/
+                position.score = beta;
+            }
+
+            return position;
+        }
     }
 
     return NO_HASH_ENTRY;

@@ -196,7 +196,6 @@ public:
 			create_square(File(move[2] - 'a'), Rank(move[3] - '1'));
 	}
 
-	Move(Move&& m) = default;
 	Move(const Move& m) : move(m.move) {};
 	Move(Move& m) : move(m.move) {}
 

@@ -2,7 +2,7 @@ CC = g++
 INCLUDE =
 LIBPATH =
 LIB =
-COPTIONS = -g
+COPTIONS =-g -O3
 TARGET = build/Engine.dll
 
 OBJS = build/EntryPoint.o build/Engine.o build/Log.o build/Transposition.o build/Evaluate.o build/types.o build/tables.o build/position.o

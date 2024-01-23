@@ -315,7 +315,7 @@ class Board():
         self.moves = []
         self.poppedEnpassant = []
         self.use_ai = ai
-        self.ai_level = 5
+        self.ai_level = 7
         self.game_ply = 0
         self.start_player = WHITE
         self.current_player = self.start_player
@@ -1080,5 +1080,5 @@ class Board():
 if __name__ == "__main__":
     #start="rnbqkbnr/1pppppPp/8/8/8/8/PpPPPPP1/RNBQKBNR w KQkq"
     #start="rnbqkbnr/pppp1ppp/4p3/8/1P6/N1P5/P2PPPPP/R1BQKBNR w KQkq"
-    board = Board(start="rnbq1knr/ppppppb1/7p/3PP3/Q1N3P1/2PB1N2/PP1B1P1P/R4RK1 w", debug = True, start_player = WHITE, ai = True);
+    board = Board(start=START, debug = True, start_player = WHITE, ai = True);
     board.mainloop()

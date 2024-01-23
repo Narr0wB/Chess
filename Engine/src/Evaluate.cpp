@@ -26,6 +26,35 @@ int mvv_lva(const Move &m_, const Position &p_) {
     return mvv_lva_lookup[attacker][victim];
 }
 
+int score_move(const Move& m_, const Position& p_, const SearchHistory& s_history_) {
+    auto killer = s_history_.killer_moves;
+    const Move tt_move = s_history_.tt_move;
+    const int ply = s_history_.ply;
+
+    int value = 0;
+
+    if (m_ == s_history_.pv_table[ply]) {
+        return MAX_MOVE_SCORE;
+    }
+
+    if (m_.flags() == MoveFlags::CAPTURE) {
+        return mvv_lva(m_, p_) * 10;
+    }
+
+    if (m_.flags() == MoveFlags::QUIET) {
+        if (m_ == s_history_.killer_moves[ply][0]) {
+            //LOG_INFO("killer: {}", m_);
+            return 900;
+        }
+        if (m_ == s_history_.killer_moves[ply][1]) {
+            //LOG_INFO("killer: {}", m_);
+            return 800;
+        }
+    }
+
+    return value;
+}
+
 int Evaluate(Position& position, int depth, int search_depth) {
     int score = 0;
 
@@ -36,18 +65,18 @@ int Evaluate(Position& position, int depth, int search_depth) {
         return (SHRT_MAX) * ((float)(depth + 1) / search_depth);
     }
 
-    if (position.in_check<WHITE>()) {
-        score += -100;
-    }
-    if (position.in_check<BLACK>()) {
-        score += 100;
-    }
-
     if (position.stalemate<WHITE>()) {
         return 0;
     }
     if (position.stalemate<BLACK>()) {
         return 0;
+    }
+
+    if (position.in_check<WHITE>()) {
+        score += -100;
+    }
+    if (position.in_check<BLACK>()) {
+        score += 100;
     }
 
     for (int p = 0; p < NPIECE_TYPES; ++p)
