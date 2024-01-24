@@ -7,7 +7,6 @@
 #include "position.h"
 #include "types.h"
 
-#include "Utils.h"
 #include "Transposition.h"
 #include "Log.h"
 
@@ -21,6 +20,7 @@ using namespace std::chrono_literals;
 struct SearchHistory {
     Move killer_moves[MAX_PLY][2];
     Move pv_table[MAX_PLY];
+    int h_moves[64][64];
     Move tt_move;
     int ply;
     int s_depth;
@@ -50,94 +50,89 @@ struct move_sorting_criterion {
     move_sorting_criterion(const Position& p_, const SearchHistory& sh_) : pos_(p_), s_history_(sh_) {}; 
 
     bool operator() (const Move& a, const Move& b) {
-        // if (PV_move != NO_MOVE) {
-        //     // If we are ordering the moves in descending order with respect to their scores, then if we find the PV_move
-        //     // we need to assign to it the highest priority, which implies that the comparision a > b is false
-        //     if (a == PV_move) { return true; } 
-            
-        //     // If the opposite is true (b is equal to PV_move), then the comparison a > b is false
-        //     if (b == PV_move) { return false; }  
-        // }
-
-        // int a_relative_score = -1;
-        // int b_relative_score = -1;
-
-        // // All capure flags have the first bit set to 1
-        // if (a.flags() == MoveFlags::CAPTURE) {
-        //     a_relative_score = mvv_lva(a, pos_);
-        // }
-        // else if (a.flags()) {
-            
-        // }
-
-        // // All capure flags have the first bit set to 1
-        // if (b.flags() == MoveFlags::CAPTURE) {
-        //     b_relative_score = mvv_lva(b, pos_);
-        // }
-        // else {
-        //     // TODO: Need to add a way to evaluate quiet moves (quiescence search)
-        //     b_relative_score = 0;
-        // }
-
         return score_move(a, pos_, s_history_) > score_move(b, pos_, s_history_);
     }
 };
 
-template<Color Us>
+template <Color Us>
 void order_move_list(MoveList<Us>& m, const Position& current_pos, SearchHistory& s_history) {
 	std::stable_sort(m.begin(), m.end(), move_sorting_criterion<Us>(current_pos, s_history));
-
-    // LOG_INFO("ORDERING... ply {}", s_history.ply) ;
-    // for (auto move : m) {
-    //     LOG_INFO("Move: {} Score: {}", move, score_move(move, current_pos, s_history));
-    // }
-
-    // int scores[m.size()];
-    // for (int i = 0; i < m.size(); ++i) {
-    //     // if (m.begin()[i] == ) {
-    //     //     scores[i] = 1000;
-    //     //     continue;
-    //     // }
-    //     scores[i] = score_move(m.begin()[i], current_pos, s_history);
-    // }
-
-    // for (int i = 0; i < m.size(); ++i) {
-    //     for (int j = i + 1; j < m.size(); ++j) {
-    //         if (scores[i] < scores[j]) {
-    //             int tmp = scores[i];
-    //             scores[i] = scores[j];
-    //             scores[j] = tmp;
-
-    //             auto tmp_move = m.begin()[i];
-    //             m.begin()[i] = m.begin()[j];
-    //             m.begin()[j] = tmp_move;
-    //         }
-    //     }
-    // }
 }
 
+template <Color C>
+int Quiescence(Position& board, int Aalpha, int Bbeta, SearchHistory& hist_, int depth) {
+    hist_.nodes++;
+
+    int score = Evaluate(board, 0, hist_.s_depth) * (C == WHITE ? 1 : -1);
+
+    if (score >= Bbeta) {
+        return Bbeta;
+    }
+
+    if (score > Aalpha) {
+        Aalpha = score;
+    }
+
+    if (depth == 0) {
+        return score;
+    }
+
+    MoveList<C> mL(board);
+    order_move_list<C>(mL, board, hist_);
+
+    for (const Move& m : mL) {
+        if (m.flags() != MoveFlags::CAPTURE) continue;
+
+        board.play<C>(m);
+
+        score = -Quiescence<C>(board, -Bbeta, -Aalpha, hist_, depth - 1);
+
+        board.undo<C>(m);
+
+        if (score > Aalpha) {
+            Aalpha = score;
+        }
+
+        if (Aalpha >= Bbeta) {
+            return Bbeta;
+        }
+
+    }
+
+    return Aalpha;
+}
 
 template <Color C>
 inline int negamax(Position& board, SearchHistory& hist, int Aalpha, int Bbeta, int depth) {
     hist.nodes++;
 
-    if (depth == 0 || 
-        board.checkmate<C>() || 
-        board.stalemate<C>()
-        // (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time) > TIME_LIMIT))
-    ) 
-    {
-        int score = Evaluate(board, depth, hist.s_depth) * (C == WHITE ? 1 : -1);
+    int ply = hist.s_depth - depth;
+    hist.ply = ply;
+
+    if (depth == 0) {
+        int score = Quiescence<C>(board, Aalpha, Bbeta, hist, 2);
         table.push_position({FLAG_EXACT, board.get_hash(), depth, score, Move(0)});
 
         return score;
     }
-    int ply = hist.s_depth - depth;
-    hist.ply = ply;
+
+    if (board.checkmate<C>()) {
+        int score = SHRT_MIN + ply;
+        table.push_position({FLAG_EXACT, board.get_hash(), depth, score, Move(0)});
+
+        return score;
+    }
+
+    if (board.stalemate<C>()) {
+        int score = 0;
+        table.push_position({FLAG_EXACT, board.get_hash(), depth, score, Move(0)});
+
+        return score;
+    }
 
     Transposition tt_hit = table.probe_hash(board.get_hash(), Aalpha, Bbeta, depth);
     if (tt_hit.score != NO_SCORE) {
-        if (tt_hit.score > Aalpha) hist.pv_table[ply] = tt_hit.best;
+        hist.pv_table[ply] = tt_hit.best;
         return tt_hit.score;
     }
     
@@ -158,13 +153,14 @@ inline int negamax(Position& board, SearchHistory& hist, int Aalpha, int Bbeta, 
             Aalpha = score;
 
             hist.pv_table[ply] = m;
+            //hist.h_moves[m.from()][m.to()] += depth;
 
             node_.flags = FLAG_EXACT;
             node_.score = Aalpha;
             node_.best = m;
         }
         if (Aalpha >= Bbeta) {
-            if (m.flags() == MoveFlags::QUIET) {
+            if (m.flags() != MoveFlags::CAPTURE) {
                 hist.killer_moves[ply][1] = hist.killer_moves[ply][0];
                 hist.killer_moves[ply][0] = m;
             }
@@ -173,7 +169,9 @@ inline int negamax(Position& board, SearchHistory& hist, int Aalpha, int Bbeta, 
             node_.score = Bbeta;
             node_.best = m;
 
-            break;
+            table.push_position(node_);
+
+            return Bbeta;
         }
     }
 
@@ -280,6 +278,8 @@ SearchInfo search_best_move(Position& board, int depth) {
     SearchInfo info = { 0 };
 
     SearchHistory hist = { 0 };
+    for (int i = 0; i < 64; i++) std::memset(hist.h_moves[i], 0, 64 * sizeof(int));
+
 
     auto time_start = std::chrono::system_clock::now();
 

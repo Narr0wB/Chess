@@ -1,5 +1,5 @@
 CC = g++
-INCLUDE =
+INCLUDE = -I./include
 LIBPATH =
 LIB =
 COPTIONS =-g -O3

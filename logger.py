@@ -1,4 +1,4 @@
-from colorama import *
+
 from termcolor import *
 
 def error(err_msg: str): 

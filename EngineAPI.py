@@ -12,8 +12,6 @@ import ctypes
 from typing import List
 from Move import * 
 
-from colorama import *
-
 ENGINE_DLL_PATH = ""
 ENGINE_DLL: ctypes.CDLL = None
 _engine_create_instance = None
@@ -189,7 +187,7 @@ class Engine():
         if (not done):
             logger.error("Could exit the engine!")
 
-        self.engine_id = None
+        self.__engine_id = None
             
     def send_command(self, command_id: CommandType, payload: bytearray = bytearray()) -> bytearray:
         if command_id > EXIT or command_id < NONE: 

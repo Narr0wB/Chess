@@ -17,6 +17,7 @@ copies or substantial portions of the Software.
 */
 
 #include "types.h"
+#include <cstring>
 
 extern const Bitboard KING_ATTACKS[NSQUARES];
 extern const Bitboard KNIGHT_ATTACKS[NSQUARES];

@@ -15,10 +15,10 @@
 #define TIME_LIMIT 15 * 1000ms
 #define TT_MAX_ENTRIES 0x4000000
 
-static TranspositionTable _table(TT_MAX_ENTRIES);
+// static TranspositionTable _table(TT_MAX_ENTRIES);
 
-struct SearchContext {};
-struct SearchInfo {};
+// struct SearchContext {};
+// struct SearchInfo {};
 
 
 

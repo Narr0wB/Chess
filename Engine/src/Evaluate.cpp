@@ -38,20 +38,19 @@ int score_move(const Move& m_, const Position& p_, const SearchHistory& s_histor
     }
 
     if (m_.flags() == MoveFlags::CAPTURE) {
-        return mvv_lva(m_, p_) * 10;
+        return mvv_lva(m_, p_) + 10000;
     }
 
-    if (m_.flags() == MoveFlags::QUIET) {
-        if (m_ == s_history_.killer_moves[ply][0]) {
-            //LOG_INFO("killer: {}", m_);
-            return 900;
-        }
-        if (m_ == s_history_.killer_moves[ply][1]) {
-            //LOG_INFO("killer: {}", m_);
-            return 800;
-        }
+    if (m_ == s_history_.killer_moves[ply][0]) {
+        //LOG_INFO("killer: {}", m_);
+        return 900;
+    }
+    if (m_ == s_history_.killer_moves[ply][1]) {
+        //LOG_INFO("killer: {}", m_);
+        return 800;
     }
 
+    return s_history_.h_moves[m_.from()][m_.to()];
     return value;
 }
 
@@ -98,58 +97,6 @@ int Evaluate(Position& position, int depth, int search_depth) {
             score += black_piece_value[p];
         }
     }
-
-    // Piece* pieces = position.getPieces();
-
-    
-
-    // for (uint8_t i = 0; i < NSQUARES; i++) {
-    //     switch (pieces[i])
-    //     {
-    //         case NO_PIECE:
-    //             break;
-    //         case WHITE_PAWN:
-    //             score += 100;
-    //             score += white_pawn_table[i];
-    //             break;
-    //         case WHITE_KNIGHT:
-    //             score += 320;
-    //             score += knight_table[i];
-    //             break;
-    //         case WHITE_BISHOP:
-    //             score += 330;
-    //             score += white_bishop_table[i];
-    //             break;
-    //         case WHITE_ROOK:
-    //             score += 500;
-    //             score += white_rook_table[i];
-    //             break;
-    //         case WHITE_QUEEN:
-    //             score += 900;
-    //             score += white_queen_table[i];
-    //             break;
-    //         case BLACK_PAWN:
-    //             score -= 100;
-    //             score -= black_pawn_table[i];
-    //             break;
-    //         case BLACK_KNIGHT:
-    //             score -= 320;
-    //             score -= knight_table[i];
-    //             break;
-    //         case BLACK_BISHOP:
-    //             score -= 330;
-    //             score -= black_bishop_table[i];
-    //             break;
-    //         case BLACK_ROOK:
-    //             score -= 500;
-    //             score -= black_rook_table[i];
-    //             break;
-    //         case BLACK_QUEEN:
-    //             score -= 900;
-    //             score -= black_queen_table[i];
-    //             break;
-    //     }
-    // }
 
     return score;
 }
