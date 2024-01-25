@@ -28,12 +28,11 @@ int mvv_lva(const Move &m_, const Position &p_) {
 
 int score_move(const Move& m_, const Position& p_, const SearchHistory& s_history_) {
     auto killer = s_history_.killer_moves;
-    const Move tt_move = s_history_.tt_move;
     const int ply = s_history_.ply;
 
     int value = 0;
 
-    if (m_ == s_history_.pv_table[ply]) {
+    if (m_ == s_history_.pv_table[ply][ply]) {
         return MAX_MOVE_SCORE;
     }
 
@@ -86,14 +85,16 @@ int Evaluate(Position& position, int depth, int search_depth) {
         // TODO: add position dependent scores (e.g. having bishops and knights move towards the centre increases scores)
 
         while (white_piece_bb)
-        {
-            pop_lsb(&white_piece_bb);
+        {   
+            Square piece_sq = pop_lsb(&white_piece_bb);
+            if (p != PieceType::KING) score += piece_position_value[p][piece_sq];
             score += white_piece_value[p];
         }
 
         while (black_piece_bb)
         {
-            pop_lsb(&black_piece_bb);
+            Square piece_sq = pop_lsb(&black_piece_bb);
+            if (p != PieceType::KING) score += piece_position_value[p + 5][piece_sq];
             score += black_piece_value[p];
         }
     }

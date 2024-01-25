@@ -34,7 +34,6 @@ extern int ROOK_ATTACK_SHIFTS[NSQUARES];
 extern Bitboard ROOK_ATTACKS[NSQUARES][4096];
 extern void initialise_rook_attacks();
 
-
 extern Bitboard get_rook_attacks(Square square, Bitboard occ);
 extern Bitboard get_xray_rook_attacks(Square square, Bitboard occ, Bitboard blockers);
 
@@ -53,6 +52,8 @@ extern Bitboard SQUARES_BETWEEN_BB[NSQUARES][NSQUARES];
 extern Bitboard LINE[NSQUARES][NSQUARES];
 extern Bitboard PAWN_ATTACKS[NCOLORS][NSQUARES];
 extern Bitboard PSEUDO_LEGAL_ATTACKS[NPIECE_TYPES][NSQUARES];
+
+extern const int piece_position_value[10][64];
 
 extern void initialise_squares_between();
 extern void initialise_line();
