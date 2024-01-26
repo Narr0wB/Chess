@@ -32,7 +32,7 @@ int score_move(const Move& m_, const Position& p_, const SearchHistory& s_histor
 
     int value = 0;
 
-    if (m_ == s_history_.pv_table[ply][ply]) {
+    if (m_ == s_history_.pv_table[0][ply]) {
         return MAX_MOVE_SCORE;
     }
 
