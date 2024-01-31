@@ -74,26 +74,26 @@ namespace Engine {
 			}
 
 			case CommandType::MOVEREQ: {
-				u8 level = command.payload[0];
+				u8 depth = command.payload[0];
 				Color C = (Color)command.payload[1];
 
-				if (level > 20)
-					level = 20;
+				if (depth > 20)
+					depth = 20;
 
 				SearchInfo s_info;
 
 				switch (C) {
 					case BLACK: {
-						s_info = search_best_move<BLACK>(m_Position, level);
+						s_info = Search::Search<BLACK>(m_Position, depth, true);
 						break;
 					}
 					case WHITE: {
-						s_info = search_best_move<WHITE>(m_Position, level);
+						s_info = Search::Search<WHITE>(m_Position, depth, true);
 						break;
 					}
 				}
 
-				if (m_Debug) { LOG_INFO("[{}] Searched {:L} total nodes in {:.1f}ms", m_InstanceID, s_info.total_nodes, s_info.search_duration_ms); }
+				if (m_Debug) { LOG_INFO("[{}] Searched {:L} total nodes in {:.1f}ms", m_InstanceID, s_info.total_nodes, s_info.search_time_ms); }
 
 				uint16_t move_internal = s_info.best.to_from_flags();
 

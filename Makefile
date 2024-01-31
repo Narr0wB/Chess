@@ -5,7 +5,8 @@ LIB =
 COPTIONS =-g -O3
 TARGET = build/Engine.dll
 
-OBJS = build/EntryPoint.o build/Engine.o build/Log.o build/Transposition.o build/Evaluate.o build/types.o build/tables.o build/position.o
+OBJS = build/EntryPoint.o build/Engine.o build/Log.o build/Transposition.o build/Evaluate.o build/types.o build/tables.o build/position.o \
+build/Search.o
 
 
 $(TARGET): $(OBJS)
@@ -14,7 +15,10 @@ $(TARGET): $(OBJS)
 build/EntryPoint.o: Engine/src/EntryPoint.cpp Engine/src/Engine.h Engine/src/Evaluate.h
 	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
  
-build/Engine.o: Engine/src/Engine.cpp Engine/src/Engine.h Engine/src/Evaluate.h
+build/Engine.o: Engine/src/Engine.cpp Engine/src/Engine.h Engine/src/search.h
+	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+
+build/Search.o: Engine/src/search.cpp Engine/src/search.h
 	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
 
 build/Log.o: Engine/src/Log.cpp Engine/src/Log.h

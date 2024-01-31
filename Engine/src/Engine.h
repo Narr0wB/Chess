@@ -11,7 +11,7 @@
 #include "tables.h"
 #include "types.h"
 #include "position.h"
-#include "Evaluate.h"
+#include "search.h"
 #include "Log.h"
 
 #define ENGINE_API __declspec(dllexport)

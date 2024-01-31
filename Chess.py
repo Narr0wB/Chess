@@ -195,91 +195,8 @@ class Piece:
         self.fentype = pieceToFen[(pieceType, color)]
         self.uniqueCode = 0
 
-# class Move:
-#     def __init__(self, move_internal: int = 0, from_sq: int = 0, to_sq: int = 0, flags: int = 0):
-#         if (move_internal):
-#             self.move = move_internal
-#         else:
-#             self.move = int((flags << 12) | (from_sq << 6) | to_sq);
-    
-#     def getFrom(self):
-#         return (self.move >> 6) & 0x3f
-
-#     def getTo(self):
-#         return self.move & 0x3f
-    
-#     def getFlags(self):
-#         return self.move >> 12
-    
-#     def setFlags(self, flags: int):
-#         self.move &= (0b111111 << 6 | 0b111111)
-#         self.move |= (flags << 12)
-    
-#     def toBytes(self):
-#         return self.move.to_bytes(2, "little")
-    
-#     def toString(self):
-#         return SQSTR[self.getFrom()] + SQSTR[self.getTo()] + MOVE_TYPESTR_B[self.getFlags()]
-    
-#     def getInternal(self):
-#         return self.move
-    
-#     def __str__(self):
-#         return_string = ""
-
-#         for square_string, square in SQSTR.items():
-#             if square == self.getFrom():
-#                 return_string += square_string
-
-#         for square_string, square in SQSTR.items():    
-#             if square == self.getTo():
-#                 return_string += square_string 
-
-#         return return_string + MOVE_TYPESTR_B[self.getFlags()]
-
-# def arrayU16toMoves(buffer: bytearray) -> list:
-#     moves = []
-
-#     if int.from_bytes(buffer[:2], "little") == 0:
-#             return moves
-
-#     for i in range(0, len(buffer), 2):
-#         moves.append(Move(int.from_bytes(buffer[i:i + 2], "little")))
-
-#     return moves
-
-
-def sleep(ms: float):
-    timer = time.time()
-    while timer + ms > time.time(): #wait is your sleep time
-        pass
-
-# str-keys only
-def sort_keys(keys: list, crescente: bool = False) -> list:
-    keys = list(keys)
-    sorted_list = keys.copy() # 3 1 2
-    temp_elem = ""
-    if crescente:
-        for g in range(len(keys)):
-            for i in range(g+1, len(keys)):
-                if int(keys[i][:keys[i].find(" ")]) < int(keys[g][:keys[g].find(" ")]):
-                    temp_elem = sorted_list[i]
-                    sorted_list[i] = sorted_list[g]
-                    sorted_list[g] = temp_elem
-    else:
-        for g in range(len(keys)):
-            for i in range(g+1, len(keys)):
-                if int(keys[i][:keys[i].find(" ")]) > int(keys[g][:keys[g].find(" ")]):
-                    temp_elem = sorted_list[i]
-                    sorted_list[i] = sorted_list[g]
-                    sorted_list[g] = temp_elem
-    
-    return sorted_list
-
-
-
 class Board():
-    def __init__(self, debug=False, tileSize=105, colorLight="#F1D9C2", colorDark="#AB7966", start: str = CHESS_START, ai: bool = False, start_player: int = -1):
+    def __init__(self, debug=False, tileSize=105, colorLight="#F1D9C2", colorDark="#AB7966", start: str = CHESS_START, ai: bool = False):
         self.debug = debug
 
         self.parent = tk.Tk()
@@ -310,21 +227,17 @@ class Board():
         "P" : ImageTk.PhotoImage(Image.open(f"{dir_path}\\assets\\wpawn.png").resize((int(self.piece_scale * self.size),int(self.piece_scale * self.size)), Resampling.LANCZOS)),
         }
 
-        
         self.selected_piece = ()
         self.moves = []
-        self.poppedEnpassant = []
         self.use_ai = ai
         self.ai_level = 7
         self.game_ply = 0
         self.start_player = WHITE
-        self.current_player = self.start_player
-        self.engine = Engine(debug_console=True)
+        self.engine = Engine(debug_console=debug)
 
         self.board = {}
         self.move_log = []
 
-        self.auziliary_pieces = [self.fenToImage["q"], self.fenToImage["b"], self.fenToImage["r"], self.fenToImage["n"], self.fenToImage["Q"], self.fenToImage["B"], self.fenToImage["R"], self.fenToImage["N"]]
         self.promotion_ui = False
         self.animations_done = True
 
@@ -332,7 +245,6 @@ class Board():
         canvas_height = self.rows * self.size
 
         self.parent.geometry(f"{(self.size+30)*8}x{(self.size+30)*8}")
-        self.parent.resizable(False, False)
         self.parent.attributes("-fullscreen", self.fullscreen)
 
         self.canvas = tk.Canvas(self.parent, borderwidth=0, highlightthickness=0,
@@ -343,14 +255,15 @@ class Board():
         self.promotion_type = None
         self.window_width = self.parent.winfo_width()
         self.window_height = self.parent.winfo_height()
-        self.offset_x = ((self.window_width - (self.size*8)) // 3) * 2
-        self.offset_y = ((self.window_height - (self.size*8)) // 2) * 1
+        self.board_offset_x = ((self.window_width - (self.size*8)) // 3) * 2
+        self.board_offset_y = ((self.window_height - (self.size*8)) // 2) * 1
 
         self.canvas.bind("<Button-1>", self.onClick)
         self.canvas.bind("<B1-Motion>", self.onDrag)
         self.canvas.bind("<ButtonRelease-1>", self.onRelease)
         self.parent.bind("<F5>", lambda e: self.loadBoard(start))
         self.parent.bind("<F6>", self.restoreMove)
+        self.parent.bind("<F11>", self.toggleFullScreen)
         self.canvas.bind("<<restore>>", self._restoreMove)
 
         self.parent.protocol("WM_DELETE_WINDOW", self.onClose)
@@ -372,8 +285,21 @@ class Board():
         self.handler.addHandle(UPDATE_LOG_EVENT, self.updateMoveLog)
 
         self.gui_font = "Noto Sans Medium"
-        self.gui = {"offx": 0, "offy": 0, "width": 0, "height": 0}
-        self._control_variables = {"engine_calculating": False, "movelog_count": 2, "movelog_list": [], "drag_calls": 0, "restore": False, "promotion_sq": None}
+        self.gui = {
+            "offx": 0, 
+            "offy": 0, 
+            "width": 0, 
+            "height": 0
+        }
+
+        self._control_variables = {
+            "engine_calculating": False, 
+            "movelog_count": 2, 
+            "movelog_list": [], 
+            "drag_calls": 0, 
+            "restore": False, 
+            "promotion_sq": None
+        }
         
         
         self.loading_animation = []
@@ -384,7 +310,15 @@ class Board():
             self.loading_animation.append(ImageTk.PhotoImage(loading_gif.resize((18, 18), resample=Resampling.NEAREST)))
 
         self.loadBoard(start)
-        
+    
+    def toggleFullScreen(self, event):
+        self.fullscreen = not self.fullscreen
+        self.parent.attributes("-fullscreen", self.fullscreen)
+
+    def onResize(self, event):
+
+        pass
+
     def onClose(self):
         try:
             print(self.toFen())
@@ -394,48 +328,6 @@ class Board():
         self.engine.exit()
 
         self.should_close = True
-
-    # def initializeEngine(self):
-    #     #subprocess.Popen([f"{dir_path}\\assets\\Engine.exe"])
-    #     time.sleep(0.1)
-
-    #     try:
-    #         # Create the pipe for communication
-    #         self.engine_handle = win32file.CreateFile(r"\\.\\pipe\\chess", 
-    #                                                 win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-    #                                                 0,
-    #                                                 None,
-    #                                                 win32file.OPEN_EXISTING,
-    #                                                 0,
-    #                                                 None)
-            
-    #     except pywintypes.error as e:
-    #         print(e)
-    #         if e.args[0] == 2:
-    #             print("[ERROR] No pipe available")
-    #         elif e.args[0] == 109:
-    #             print("[ERROR] Could not open pipe, exiting")
-    #             exit(0) 
-
-    # def engineSendCommand(self, command_type: int, command_payload: bytearray = None, wait: bool = True) -> bytearray:
-    #     if command_payload == None:
-    #         command_payload = bytearray()
-
-    #     _, _ = win32file.WriteFile(self.engine_handle, command_type.to_bytes(1) + command_payload) 
-
-    #     if self.debug:
-    #         pass
-    #         #print("Sent the engine", command_type, command_payload)
-
-    #     if wait:
-    #         res = win32file.ReadFile(self.engine_handle, 1024)
-    #         if self.debug:
-    #             pass
-    #             #print("Received from the engine", res[1])
-
-    #         return res[1]
-
-    #     return bytearray()
 
     def mainloop(self):
         while not self.should_close:
@@ -494,6 +386,7 @@ class Board():
 
         #print(f"it took {end-start}s")
 
+    # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
     def createPiece(self, square: int, piece_type: int, piece_color: int): 
         piece = Piece(piece_type, piece_color, self.fenToImage[pieceToFen[piece_type, piece_color]])
 
@@ -576,7 +469,6 @@ class Board():
         self.engine.undo()
         self.current_player ^= 1
         
-
         last_move, last_move_capture = self.move_log.pop(-1)
 
         from_sq = last_move.getFrom()
@@ -626,9 +518,9 @@ class Board():
 
     def drawGUI(self):
         offset_y = int(self.window_height * 0.10)
-        offset_x = int(self.offset_x * 0.10)
+        offset_x = int(self.board_offset_x * 0.10)
 
-        rect_width = (self.offset_x - 2*offset_x)
+        rect_width = (self.board_offset_x - 2*offset_x)
         rect_height = (self.window_height - 2*offset_y)
 
         self.gui["offx"] = offset_x
@@ -650,8 +542,8 @@ class Board():
         for row in range(8):
             color = self.board_color_light if color == self.board_color_dark else self.board_color_dark
             for col in range(8):
-                x1 = self.offset_x + (col * self.size) 
-                y1 = self.offset_y + (row * self.size) 
+                x1 = self.board_offset_x + (col * self.size) 
+                y1 = self.board_offset_y + (row * self.size) 
                 x2 = x1 + self.size
                 y2 = y1 + self.size
                 self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=color, tags=("sq%02dn" % ((7 - row)*8 + col), "square"))
@@ -674,23 +566,28 @@ class Board():
 
         self.selected_piece = None
         self.promotion_ui = False
-        self._control_variables = {"engine_calculating": False, "movelog_count": 2, "movelog_list": [], "drag_calls": 0, "restore": False, "promotion_sq": None}
+        self._control_variables = {
+            "engine_calculating": False, 
+            "movelog_count": 2, 
+            "movelog_list": [], 
+            "drag_calls": 0, 
+            "restore": False, 
+            "promotion_sq": None
+        }
 
         self.engine.set(fen)
-        self.initFromFen(fen)
+        self.initBoard(fen)
         
         self.drawBoard()
         self.drawGUI()
 
-        # self.promotion_squares_white = False
-        # self.promotion_squares_black = False
         if self.selected_piece:
             self.resetSelectedColor()
             self.resetSelectedMovesColor()
 
 
     # Load a board from a FEN notation
-    def initFromFen(self, fen: str):
+    def initBoard(self, fen: str):
         self.board.clear()
 
         spacePos = fen.find(" ")
@@ -717,20 +614,10 @@ class Board():
 
         return fen_str
 
-    # Add a piece to self.board and assign each piece a unique code to be able to distinguish between same type&color pieces
-    def addpiece(self, piece: Piece, row: int, column: int):
-        numberOfIstances = 0
-        for key in self.board:
-            if self.board[key].fentype == piece.fentype and self.board[key].color == piece.color:
-                numberOfIstances += 1
-
-        piece.uniqueCode = f"{numberOfIstances}{piece.fentype}"
-        self.board[(row, column)] = piece
-
     # During each frame, redraw each piece
     def drawPiece(self, piece: Piece, square: int):
-        x0 = (((square % 8)) * self.size) + int(self.size/2) + self.offset_x
-        y0 = self.parent.winfo_height() - (((square // 8)) * self.size) - int(self.size/2) - self.offset_y
+        x0 = (((square % 8)) * self.size) + int(self.size/2) + self.board_offset_x
+        y0 = self.parent.winfo_height() - (((square // 8)) * self.size) - int(self.size/2) - self.board_offset_y
 
         self.canvas.create_image(x0, y0, image=piece.image, tags=(piece.uniqueCode, "piece"), anchor=tk.CENTER)
 
@@ -743,10 +630,10 @@ class Board():
     def movePiece(self, from_sq: int, to_sq: int):
         self.board[to_sq] = self.board.pop(from_sq)
 
-        x0 = ((from_sq % 8) * self.size) + int(self.size/2) + self.offset_x
-        y0 = ((7 - (from_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
-        x1 = ((to_sq % 8) * self.size) + int(self.size/2) + self.offset_x
-        y1 = ((7 - (to_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
+        x0 = ((from_sq % 8) * self.size) + int(self.size/2) + self.board_offset_x
+        y0 = ((7 - (from_sq // 8)) * self.size) + int(self.size/2) + self.board_offset_y
+        x1 = ((to_sq % 8) * self.size) + int(self.size/2) + self.board_offset_x
+        y1 = ((7 - (to_sq // 8)) * self.size) + int(self.size/2) + self.board_offset_y
 
         frame_time = int(self.application_fps/2)
         
@@ -799,8 +686,8 @@ class Board():
             self.movePiece(from_sq, to_sq)
         else:
             self.board[to_sq] = self.board.pop(from_sq)
-            x1 = ((to_sq % 8) * self.size) + int(self.size/2) + self.offset_x
-            y1 = ((7 - (to_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
+            x1 = ((to_sq % 8) * self.size) + int(self.size/2) + self.board_offset_x
+            y1 = ((7 - (to_sq // 8)) * self.size) + int(self.size/2) + self.board_offset_y
             self.canvas.coords(self.board[to_sq].uniqueCode, x1, y1)
 
         if flags >= PR_KNIGHT and flags != CAPTURE and flags != EN_PASSANT:
@@ -884,7 +771,7 @@ class Board():
         return Move(0)
 
     def onRelease(self, event):
-        if self._control_variables["drag_calls"] > 60 and self.selected_piece != None:
+        if self._control_variables["drag_calls"] > 10 and self.selected_piece != None:
             destinations = [move.getTo() for move in self.moves]
             drop_sq = self.getMouseClickPos(event)
             
@@ -897,8 +784,8 @@ class Board():
                     if drop_sq in self.board:
                         self.canvas.delete(self.board[drop_sq].uniqueCode)
 
-                    x1 = ((drop_sq % 8) * self.size) + int(self.size/2) + self.offset_x
-                    y1 = ((7 - (drop_sq // 8)) * self.size) + int(self.size/2) + self.offset_y
+                    x1 = ((drop_sq % 8) * self.size) + int(self.size/2) + self.board_offset_x
+                    y1 = ((7 - (drop_sq // 8)) * self.size) + int(self.size/2) + self.board_offset_y
                     self.canvas.coords(self.board[self.selected_piece].uniqueCode, x1, y1)
 
                     self._control_variables["promotion_sq"] = drop_sq
@@ -920,8 +807,8 @@ class Board():
             
         self._control_variables["drag_calls"] = 0
         if self.selected_piece in self.board:
-            x1 = ((self.selected_piece % 8) * self.size) + int(self.size/2) + self.offset_x
-            y1 = ((7 - (self.selected_piece // 8)) * self.size) + int(self.size/2) + self.offset_y
+            x1 = ((self.selected_piece % 8) * self.size) + int(self.size/2) + self.board_offset_x
+            y1 = ((7 - (self.selected_piece // 8)) * self.size) + int(self.size/2) + self.board_offset_y
             self.canvas.coords(self.board[self.selected_piece].uniqueCode, x1, y1)
         
     def onDrag(self, event):
@@ -1045,10 +932,10 @@ class Board():
         
         if self.current_player == WHITE:
             for i in range(4):
-                x1 = self.offset_x + (i * sq_size)
-                y1 = self.offset_y - sq_size - 5
+                x1 = self.board_offset_x + (i * sq_size)
+                y1 = self.board_offset_y - sq_size - 5
 
-                x0 = self.offset_x + (i * sq_size) + (sq_size//2)
+                x0 = self.board_offset_x + (i * sq_size) + (sq_size//2)
                 y0 = y1 + (sq_size//2)
                 
                 x2 = x1 + sq_size
@@ -1059,12 +946,12 @@ class Board():
                 self.canvas.tag_lower("square")
         if self.current_player == BLACK:
             for i in range(4):
-                x1 = self.offset_x + (i * sq_size)
-                y1 = self.offset_y + 5 + (8 * self.size)
+                x1 = self.board_offset_x + (i * sq_size)
+                y1 = self.board_offset_y + 5 + (8 * self.size)
                 x2 = x1 + sq_size
                 y2 = y1 + sq_size
 
-                x0 = self.offset_x + (i * sq_size) + (sq_size//2)
+                x0 = self.board_offset_x + (i * sq_size) + (sq_size//2)
                 y0 = y1 + (sq_size//2)
     
                 self.canvas.create_rectangle(x1, y1, x2, y2, outline="white", fill=self.board_color_light, tags=(f"pr{i}", "promotion", "square"))
@@ -1080,5 +967,5 @@ class Board():
 if __name__ == "__main__":
     #start="rnbqkbnr/1pppppPp/8/8/8/8/PpPPPPP1/RNBQKBNR w KQkq"
     #start="rnbqkbnr/pppp1ppp/4p3/8/1P6/N1P5/P2PPPPP/R1BQKBNR w KQkq"
-    board = Board(start=START, debug = True, start_player = WHITE, ai = True);
+    board = Board(start=START, debug = True, ai = True);
     board.mainloop()
