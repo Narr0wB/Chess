@@ -33,6 +33,7 @@ struct SearchContext {
     int history_moves[64][64];
     int search_depth;
     uint32_t nodes;
+    uint32_t reduced_nodes;
 };
 
 struct SearchInfo {
@@ -119,7 +120,7 @@ inline int negamax(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
         return tt_hit.score;
     }
     
-    if (depth == 0) {
+    if (depth <= 0) {
         int score = Quiescence<C>(ctx, Aalpha, Bbeta, 3);
         _table.push_position({FLAG_EXACT, ctx.board.get_hash(), depth, score, Move(0)});
 
@@ -146,11 +147,31 @@ inline int negamax(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
 
     order_move_list(mL, ctx, ply);
 
+    int moveCount = 0;
+    int score = 0;
     for (const Move& m : mL) {
+        moveCount++;
         ctx.board.play<C>(m);
 
-        int score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
+        // Late move reduction 
+        if (depth > 2 and
+            moveCount > 2 and
+            m.flags() == MoveFlags::QUIET and
+            !ctx.board.in_check<~C>()) {
+                // If the conditions are met then we do a search at reduced depth (-3)
+                score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 3);
 
+                ctx.reduced_nodes++;
+
+                if (score > Aalpha) {
+                    score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
+                }
+            }
+        else {
+            score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
+        }
+
+        
         ctx.board.undo<C>(m);
 
 
@@ -170,6 +191,9 @@ inline int negamax(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
             node_.flags = FLAG_EXACT;
             node_.best = m;
         }
+
+        // Fail High i.e. we have found a move that is better than what our opponent is guaranteed to take, which means
+        // that this move will not be taken, though it is useful to keep track of these moves
         if (Aalpha >= Bbeta) {
             if (m.flags() != MoveFlags::CAPTURE) {
                 ctx.killer_moves[ply][1] = ctx.killer_moves[ply][0];
@@ -226,7 +250,7 @@ SearchInfo Search(Position& _position, int depth, bool debug = false) {
         s_info.total_nodes += s_ctx.nodes;
         
         if (debug) {
-            LOG_INFO("pos score: {} depth: {} nodes: {} time: {:.1f}ms t_hits: {}", score, i, s_ctx.nodes, iteration_duration, tt_hits);
+            LOG_INFO("pos score: {} depth: {} nodes: {} time: {:.1f}ms t_hits: {} reduced: {}", score, i, s_ctx.nodes, iteration_duration, tt_hits, s_ctx.reduced_nodes);
         }
 
         tt_hits = 0;

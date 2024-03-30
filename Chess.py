@@ -230,7 +230,7 @@ class Board():
         self.selected_piece = ()
         self.moves = []
         self.use_ai = ai
-        self.ai_level = 7
+        self.ai_level = 10
         self.game_ply = 0
         self.start_player = WHITE
         self.engine = Engine(debug_console=debug)

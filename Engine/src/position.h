@@ -160,6 +160,14 @@ public:
 		return attackers_from<~C>(bsf(bitboard_of(C, KING)), all_pieces<WHITE>() | all_pieces<BLACK>());
 	}
 
+	template<Color C> inline bool gives_check_to(const Move& m) {
+		play<~C>(m);
+		bool check = in_check<C>();
+		undo<~C>(m);
+
+		return check;
+	}
+
 	template<Color C> bool checkmate() const;
 	template<Color C> bool stalemate() const;
 
