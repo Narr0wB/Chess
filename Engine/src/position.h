@@ -139,8 +139,9 @@ public:
 	static void set(const std::string& fen, Position& p);
 	std::string fen() const;
 
-	Position& operator=(const Position&) = delete;
+	// Position& operator=(const Position&) = delete;
 	inline bool operator==(const Position& other) const { return hash == other.hash; }
+	inline operator bool() const { return hash; }
 
 	inline Bitboard bitboard_of(Piece pc) const { return piece_bb[pc]; }
 	inline Bitboard bitboard_of(Color c, PieceType pt) const { return piece_bb[make_piece(c, pt)]; }
@@ -855,7 +856,7 @@ Move* Position::generate_legals(Move* list) {
 		//2. No piece is attacking between the the rook and the king
 		//3. The king is not in check
 		if (!((history[game_ply].entry & oo_mask<Us>()) | ((all | danger) & oo_blockers_mask<Us>())))
-			*list++ = Us == WHITE ? Move(e1, h1, OO) : Move(e8, g8, OO);
+			*list++ = Us == WHITE ? Move(e1, g1, OO) : Move(e8, g8, OO);
 		if (!((history[game_ply].entry & ooo_mask<Us>()) |
 			((all | (danger & ~ignore_ooo_danger<Us>())) & ooo_blockers_mask<Us>())))
 			*list++ = Us == WHITE ? Move(e1, c1, OOO) : Move(e8, c8, OOO);
@@ -1354,7 +1355,28 @@ class MoveList {
 		explicit MoveList(Position& p) : last(p.generate_legals<Us>(list)) {}
 		explicit MoveList(Position& p, Square sq) : last(p.generate_legals_for<Us>(sq, list)) {}
 
+		inline Move& operator[](size_t idx) { return list[idx]; }
+
 		Move* begin() { return list; }
 		Move* end() { return last; }
 		size_t size() const { return last - list; }
+		Move find(uint16_t to_from, uint8_t promotion = 0) {
+			for (int i = 0; i < size(); ++i) {
+
+				// LOG_INFO("{} {} {} {}", list[i], list[i].flags(), promotion, ((list[i].flags() & (promotion)) == promotion));
+
+				if (promotion) {
+					if (list[i].to_from() == to_from && ((list[i].flags() & (promotion)) == promotion)) {
+						return list[i];
+					}
+				}
+				else {
+					if (list[i].to_from() == to_from) {
+						return list[i];
+					}
+				}
+			}
+
+			return Move(0);
+		}
 };

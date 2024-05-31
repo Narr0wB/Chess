@@ -24,25 +24,27 @@ int mvv_lva(const Move &m_, const Position &p_) {
     return mvv_lva_lookup[attacker][victim];
 }
 
-int score_move(const Move& m_, const SearchContext& ctx, int ply) {
+int score_move(const Move& m_, const SearchContext* ctx, int ply) {
     int value = 0;
 
-    if (ctx.search_depth != 0 && m_ == ctx.pv_table[ctx.search_depth - 1][0][ply]) {
+    // Score the move from the previous iterative search pv higher 
+    if (ctx->info.depth != 0 && m_ == ctx->data.pv_table[0][ply]) {
         return MAX_MOVE_SCORE;
     }
 
     if (m_.flags() == MoveFlags::CAPTURE) {
-        return mvv_lva(m_, ctx.board) + 10000;
+        return mvv_lva(m_, ctx->board) + 10000;
     }
 
-    if (m_ == ctx.killer_moves[ply][0]) {
+    if (m_ == ctx->data.killer_moves[0][ply]) {
         return 9000;
     }
-    if (m_ == ctx.killer_moves[ply][1]) {
+    if (m_ == ctx->data.killer_moves[1][ply]) {
         return 8000;
     }
 
-    return ctx.history_moves[m_.from()][m_.to()];
+    return ctx->data.history_moves[m_.from()][m_.to()];
+    //return 0;
 }
 
 } // namespace Search

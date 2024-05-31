@@ -166,7 +166,7 @@ enum MoveFlags : int {
 	CAPTURE = 0b1000,
 	CAPTURES = 0b1111,
 	EN_PASSANT = 0b1010,
-	PROMOTIONS = 0b0111,
+	PROMOTIONS = 0b0100,
 	PROMOTION_CAPTURES = 0b1100,
 	PR_KNIGHT = 0b0100, PR_BISHOP = 0b0101, PR_ROOK = 0b0110, PR_QUEEN = 0b0111,
 	PC_KNIGHT = 0b1100, PC_BISHOP = 0b1101, PC_ROOK = 0b1110, PC_QUEEN = 0b1111,
@@ -201,7 +201,7 @@ public:
 
 	inline Square to() const { return Square(move & 0x3f); }
 	inline Square from() const { return Square((move >> 6) & 0x3f); }
-	inline int to_from() const { return move & 0xffff; }
+	inline int to_from() const { return move & 0xfff; }
 	inline uint16_t to_from_flags() const { return move; }
 	inline MoveFlags flags() const { return MoveFlags((move >> 12) & 0xf); }
 	static std::string toString(Move& move);

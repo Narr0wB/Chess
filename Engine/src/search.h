@@ -6,41 +6,60 @@
 
 #include "position.h"
 #include "types.h"
-
 #include "Transposition.h"
 #include "Evaluate.h"
 #include "Log.h"
+#include "misc.h"
 
 #define INF 5000000
 #define TIME_LIMIT 15 * 1000ms
-#define TT_MAX_ENTRIES 0x4000000
 
-static int tt_hits = 0;
-static TranspositionTable _table(TT_MAX_ENTRIES, tt_hits);
+#define MAX_DEPTH 20
+#define MAX_TABLE 21
 
-#define MAX_PLY 20
-
-struct SearchContext {
-    SearchContext (Position& b, int d) : 
-    board(b),
-    search_depth(d)
-    {};
-
-    Position board;
-    Move pv_table[MAX_PLY][MAX_PLY][MAX_PLY];
-    int pv_table_len[MAX_PLY];
-    Move killer_moves[2][MAX_PLY];
-    int history_moves[64][64];
-    int search_depth;
-    uint32_t nodes;
-    uint32_t reduced_nodes;
+struct RepetitionTable {
+    uint64_t hashes[2];
+    int count = 0;
 };
 
 struct SearchInfo {
-    uint32_t total_nodes;
-    Move best;
-    int score;
-    float search_time_ms;
+    bool timeset = false;
+    bool movetimeset = false;
+
+    uint64_t search_start_time;
+    uint64_t search_time_max;
+
+    bool nodeset = false;
+
+    uint64_t nodeslimit;
+    uint64_t nodes;
+
+    uint32_t movestogo;
+
+    int depth;
+    int quiescence_depth;
+};
+
+struct SearchData {
+    Move pv_table[MAX_TABLE][MAX_TABLE];
+    int pv_table_len[MAX_TABLE];
+
+    Move killer_moves[2][MAX_TABLE];
+    int history_moves[64][64];
+};
+
+struct SearchContext {
+    std::atomic<bool> stop_flag;
+
+    Position board;
+    TranspositionTable* table;
+    RepetitionTable repetition;
+
+    SearchInfo info;
+    SearchData data;
+
+    // debug
+    uint32_t reduced_nodes;
 };
 
 namespace Search {
@@ -48,15 +67,15 @@ namespace Search {
 int mvv_lva(const Move &m_, const Position &p_);
 
 #define MAX_MOVE_SCORE 1000000
-int score_move(const Move& m_, const SearchContext& ctx, int ply);
+int score_move(const Move& m_, const SearchContext* ctx, int ply);
 
 // Order moves using context
 template <Color Us>
 struct move_sorting_criterion {
-    const SearchContext& _ctx;
+    const SearchContext* _ctx;
     int _ply;
 
-    move_sorting_criterion(const SearchContext& c, int p) : _ctx(c), _ply(p) {}; 
+    move_sorting_criterion(const SearchContext* c, int p) : _ctx(c), _ply(p) {}; 
 
     bool operator() (const Move& a, const Move& b) {
         return score_move(a, _ctx, _ply) > score_move(b, _ctx, _ply);
@@ -64,15 +83,45 @@ struct move_sorting_criterion {
 };
 
 template <Color Us>
-void order_move_list(MoveList<Us>& m, const SearchContext& ctx, int ply) {
-	std::stable_sort(m.begin(), m.end(), move_sorting_criterion<Us>(ctx, ply));
+void order_move_list(MoveList<Us>& m, const SearchContext* ctx, int ply) {
+
+
+    //std::stable_sort(m.begin(), m.end(), move_sorting_criterion<Us>(ctx, ply));
+
+    int dim = m.size();
+    bool sorted = 0;
+
+    while (!sorted) {
+        sorted = 1;
+        for (int i = 0; i < dim - 1; ++i) {
+            if (score_move(m[i], ctx, ply) < score_move(m[i + 1], ctx, ply)) {
+                auto tmp = m[i];
+                m[i] = m[i + 1];
+                m[i + 1] = tmp;
+
+                sorted = 0;
+            }
+        }
+        dim -= 1;
+    }
+
+    // for (int i = 0; i < m.size(); ++i) {
+    //     for (int j = i + 1; j < m.size(); ++j) {
+    //         if (score_move(m[i], ctx, ply) < score_move(m[j], ctx, ply)) {
+    //             auto tmp = m[i];
+    //             m[i] = m[j];
+    //             m[j] = tmp;
+    //         }
+    //     }
+    // }
 }
 
 template <Color C>
-int Quiescence(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
-    ctx.nodes++;
+int Quiescence(SearchContext* ctx, int Aalpha, int Bbeta, int depth) {
+    ctx->info.nodes++;
 
-    int score = Evaluate(ctx.board) * (C == WHITE ? 1 : -1);
+    int score = Evaluate(ctx->board) * (C == WHITE ? 1 : -1);
+    int ply = ctx->info.quiescence_depth - depth;
 
     if (score >= Bbeta) {
         return Bbeta;
@@ -86,19 +135,24 @@ int Quiescence(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
         return Aalpha;
     }
 
-    MoveList<C> mL(ctx.board);
+    MoveList<C> mL(ctx->board);
 
-    // If we are in the quiescence search, that means we are at the highest ply, which is equal to the starting search depth
-    order_move_list<C>(mL, ctx, ctx.search_depth);
+    order_move_list<C>(mL, ctx, ply);
 
     for (const Move& m : mL) {
         if (m.flags() != MoveFlags::CAPTURE) continue;
 
-        ctx.board.play<C>(m);
+        ctx->board.play<C>(m);
 
         score = -Quiescence<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
 
-        ctx.board.undo<C>(m);
+        ctx->board.undo<C>(m);
+
+        if ((ctx->stop_flag) ||
+            (ctx->info.timeset && GetTimeMS() >= ctx->info.search_time_max) || 
+            (ctx->info.nodeset && ctx->info.nodes > ctx->info.nodeslimit)) {
+            return 0;
+        }
 
         if (score > Aalpha) {
             Aalpha = score;
@@ -113,29 +167,33 @@ int Quiescence(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
 }
 
 template <Color C>
-inline int negamax(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
+int negamax(SearchContext* ctx, int Aalpha, int Bbeta, int depth) {
+    ctx->info.nodes++;
 
-    Transposition tt_hit = _table.probe_hash(ctx.board.get_hash(), Aalpha, Bbeta, depth);
-    if (tt_hit.flags != FLAG_EMPTY) {
-        return tt_hit.score;
+    int ply = ctx->info.depth - depth;
+    int move_count = 0;
+    int score = 0;
+    int found_pv = 0;
+    ctx->data.pv_table_len[ply] = ply;
+
+    Transposition tt_hit = ctx->table->probe_hash(ctx->board.get_hash(), Aalpha, Bbeta, depth);
+    if (tt_hit.flags != FLAG_EMPTY && ply >= 2) {
+        // return tt_hit.score;
     }
     
     if (depth <= 0) {
-        int score = Quiescence<C>(ctx, Aalpha, Bbeta, 3);
-        _table.push_position({FLAG_EXACT, ctx.board.get_hash(), depth, score, Move(0)});
+        int score = Quiescence<C>(ctx, Aalpha, Bbeta, ctx->info.quiescence_depth);
+        ctx->table->push_position({FLAG_EXACT, ctx->board.get_hash(), depth, score, Move(0)});
 
         return score;
     }
     
-    int ply = ctx.search_depth - depth;
-    ctx.nodes++;
-    
-    Transposition node_ = Transposition{FLAG_ALPHA, ctx.board.get_hash(), depth, NO_SCORE, NO_MOVE};
+    Transposition node_ = Transposition{FLAG_ALPHA, ctx->board.get_hash(), depth, NO_SCORE, NO_MOVE};
 
-    MoveList<C> mL(ctx.board);
+    MoveList<C> mL(ctx->board);
 
     if (mL.size() == 0) {
-        if (ctx.board.in_check<C>()) {
+        if (ctx->board.in_check<C>()) {
             // If checkmate
             return SHRT_MIN + ply;
         }
@@ -147,130 +205,141 @@ inline int negamax(SearchContext& ctx, int Aalpha, int Bbeta, int depth) {
 
     order_move_list(mL, ctx, ply);
 
-    int moveCount = 0;
-    int score = 0;
     for (const Move& m : mL) {
-        moveCount++;
-        ctx.board.play<C>(m);
+        move_count++;
+        ctx->board.play<C>(m);
 
-        // Late move reduction 
-        if (depth > 2 and
-            moveCount > 2 and
-            m.flags() == MoveFlags::QUIET and
-            !ctx.board.in_check<~C>()) {
-                // If the conditions are met then we do a search at reduced depth (-3)
-                score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 3);
+        // score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
 
-                ctx.reduced_nodes++;
+        if (found_pv) {
+            score = -negamax<~C>(ctx, -Aalpha - 1, -Aalpha, depth - 1);
 
-                if (score > Aalpha) {
+            if ((score > Aalpha) && (score < Bbeta)) {
+                score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
+            }
+        }
+        else {
+            //score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
+            // Late move reduction 
+            if (ply > 2 && move_count > 4 && m.flags() != MoveFlags::CAPTURE && !ctx->board.in_check<C>()) {
+                    // If the conditions are met then we do a search at reduced depth with a reduced window (two fold deeper)
+                    score = -negamax<~C>(ctx, -Aalpha - 1, -Aalpha, depth - 1 - 2);
+
+                    if (score > Aalpha) {
+                        score = -negamax<~C>(ctx, -Aalpha - 1, -Aalpha, depth - 1);
+
+                        if ((score > Aalpha) && (score < Bbeta)) {
+
+                            // Do full depth and full window
+                            score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
+                        }
+                    }
+                    ctx->reduced_nodes++;
+                }
+            else {
+                // Do reduced window
+                score = -negamax<~C>(ctx, -Aalpha - 1, -Aalpha, depth - 1);
+
+                if ((score > Aalpha) && (score < Bbeta)) {
                     score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
                 }
             }
-        else {
-            score = -negamax<~C>(ctx, -Bbeta, -Aalpha, depth - 1);
-        }
-
+        }  
         
-        ctx.board.undo<C>(m);
+        ctx->board.undo<C>(m);
 
-
+        // We have found a move that is better than the current alpha
         if (score > Aalpha) {
             Aalpha = score;
+            found_pv = 1;
 
             // Update the main PV line
-            ctx.pv_table[ctx.search_depth][ply][ply] = m;
-            for (int i = ply + 1; i < ctx.pv_table_len[ply + 1]; ++i) {
-                ctx.pv_table[ctx.search_depth][ply][i] = ctx.pv_table[ctx.search_depth][ply + 1][i];
+            ctx->data.pv_table[ply][ply] = m;
+            for (int i = ply + 1; i < ctx->data.pv_table_len[ply + 1]; ++i) {
+                ctx->data.pv_table[ply][i] = ctx->data.pv_table[ply + 1][i];
             }
-            ctx.pv_table_len[ply] = ctx.pv_table_len[ply + 1];
+            ctx->data.pv_table_len[ply] = ctx->data.pv_table_len[ply + 1];
             
             // Rank history moves
-            if (m.flags() == MoveFlags::QUIET) ctx.history_moves[m.from()][m.to()] += depth;
+            if (m.flags() == MoveFlags::QUIET) ctx->data.history_moves[m.from()][m.to()] += depth;
 
             node_.flags = FLAG_EXACT;
             node_.best = m;
         }
 
-        // Fail High i.e. we have found a move that is better than what our opponent is guaranteed to take, which means
+        // Fail High Node, i.e. we have found a move that is better than what our opponent is guaranteed to take, which means
         // that this move will not be taken, though it is useful to keep track of these moves
         if (Aalpha >= Bbeta) {
             if (m.flags() != MoveFlags::CAPTURE) {
-                ctx.killer_moves[ply][1] = ctx.killer_moves[ply][0];
-                ctx.killer_moves[ply][0] = m;
+                ctx->data.killer_moves[1][ply] = ctx->data.killer_moves[0][ply];
+                ctx->data.killer_moves[0][ply] = m;
             }
 
             node_.flags = FLAG_BETA;
             node_.score = Bbeta;
 
-            _table.push_position(node_);
+            ctx->table->push_position(node_);
 
             return Bbeta;
         }
     }
 
-    node_.score = Aalpha;
-    _table.push_position(node_);
+    // If out of time or hit any other constraints then exit the search
+    if ((ctx->stop_flag) ||
+        (ctx->info.timeset && GetTimeMS() >= ctx->info.search_time_max) || 
+        (ctx->info.nodeset && ctx->info.nodes > ctx->info.nodeslimit)) {
+        return 0;
+    }
 
+    node_.score = Aalpha;
+    ctx->table->push_position(node_);
+
+    // Fail Low Node - No better move was found
     return Aalpha;
 }
 
 template <Color C>
-SearchInfo Search(Position& _position, int depth, bool debug = false) {
-    // Initialize the search context
-    SearchContext s_ctx(_position, depth);
-
-    // Initialize the search info result
-    SearchInfo s_info;
-
+void Search(SearchContext* ctx) {
     int alpha = -INF;
     int beta = INF;
 
-    auto time_start = std::chrono::system_clock::now();
+    int max_depth = ctx->info.depth;
 
-    for (int i = 0; i <= depth; ++i) {
-        auto iteration_time_start = std::chrono::system_clock::now();
-
+    int current_depth = 0;
+    Move bestMove = NO_MOVE;
+    for (; current_depth <= max_depth; ++current_depth) {
         // Set the context's search depth to the current depth in the iterative deepening process
-        s_ctx.search_depth = i;
+        ctx->info.depth = current_depth;
 
         // Score the current position
-        int score = negamax<C>(s_ctx, alpha, beta, i);
+        int score = negamax<C>(ctx, alpha, beta, current_depth) * (C == WHITE ? 1 : -1);
 
-        // Adjust the window for the next search according to this search's score
-        // alpha = score - 50;
-        // beta = score + 50;
 
-        // If the current score falls out of the window
-        // TODO
+        std::cout << "info depth " << current_depth << " score cp " << score << " nodes " << ctx->info.nodes << " tthits " << (ctx->table->hits) << " pv ";
+        for (int j = 0; j < ctx->data.pv_table_len[0]; j++) {
+            std::cout << ctx->data.pv_table[0][j] << " ";
+        }
+        std::cout << std::endl;
 
-        auto iteration_time_stop = std::chrono::system_clock::now();
-        float iteration_duration = (float) std::chrono::duration_cast<std::chrono::microseconds>(iteration_time_stop - iteration_time_start).count() / 1000;
-
-        s_info.total_nodes += s_ctx.nodes;
-        
-        if (debug) {
-            LOG_INFO("pos score: {} depth: {} nodes: {} time: {:.1f}ms t_hits: {} reduced: {}", score, i, s_ctx.nodes, iteration_duration, tt_hits, s_ctx.reduced_nodes);
+        // If we are out of time or over the limit for nodes (if there is one) then break
+        if ((ctx->stop_flag) ||
+            (ctx->info.timeset && GetTimeMS() >= ctx->info.search_time_max) || 
+            (ctx->info.nodeset && ctx->info.nodes > ctx->info.nodeslimit)) {
+            break;
         }
 
-        tt_hits = 0;
+        bestMove = ctx->data.pv_table[0][0];
 
-        s_ctx.nodes = 0;
+        ctx->table->hits = 0;
     }
 
-    auto time_end = std::chrono::system_clock::now();
-    s_info.search_time_ms = (float) std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_start).count() / 1000;
+    ctx->info.nodes = 0;
 
-    s_info.best = s_ctx.pv_table[depth][0][0];
-
-    return s_info;
+    // Print the best move found
+    std::cout << "bestmove ";
+    std::cout << bestMove;
+    std::cout << std::endl;
 }
-
-
-class Worker {
-    private:
-    public:
-};
 
 } // namespace Search
 

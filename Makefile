@@ -2,20 +2,32 @@ CC = g++
 INCLUDE = -I./include
 LIBPATH =
 LIB =
-COPTIONS =-g -O3
-TARGET = build/Engine.dll
+COPTIONS = -g -O3
+TARGETDLL = build/Engine.dll
+TARGETEXE = build/Engine.exe
+TARGETDEF = 0
+
+EXE = 1
+
+ifeq ($(EXE), 1)
+	TARGET = $(TARGETEXE)
+	TARGETDEF = -D__EXE=1
+else
+	TARGET = $(TARGETDLL)
+	COPTIONS = -g -O3 -shared
+	TARGETDEF = -D__DLL=1
+endif
 
 OBJS = build/EntryPoint.o build/Engine.o build/Log.o build/Transposition.o build/Evaluate.o build/types.o build/tables.o build/position.o \
-build/Search.o
-
+build/Search.o build/misc.o build/thread.o
 
 $(TARGET): $(OBJS)
-	$(CC) -shared $(LIBPATH) $(COPTIONS) $(OBJS) -o $(TARGET) $(LIB)
+	$(CC) $(COPTIONS) $(OBJS) -o $(TARGET) $(LIB)
 
 build/EntryPoint.o: Engine/src/EntryPoint.cpp Engine/src/Engine.h Engine/src/Evaluate.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+	$(CC) $(INCLUDE) $(COPTIONS) $(TARGETDEF) -c $< -o $@
  
-build/Engine.o: Engine/src/Engine.cpp Engine/src/Engine.h Engine/src/search.h
+build/Engine.o: Engine/src/Engine.cpp Engine/src/Engine.h Engine/src/search.h Engine/src/position.h
 	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
 
 build/Search.o: Engine/src/search.cpp Engine/src/search.h
@@ -39,6 +51,13 @@ build/tables.o: Engine/src/tables.cpp Engine/src/tables.h
 build/position.o: Engine/src/position.cpp Engine/src/position.h
 	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
 
+build/misc.o: Engine/src/misc.cpp Engine/src/misc.h
+	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+
+build/thread.o: Engine/src/thread.cpp Engine/src/thread.h
+	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+
 clean:
 	rm build/*.o
-	powershell rm build/*.exe
+	powershell rm build/*.o
+

@@ -19,10 +19,14 @@
 
 */
 
+#ifdef __DLL
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
-// int main(void) {
+#else
+int main(void) {
+#endif
 // 	int ul_reason_for_call = 1;
 
+#ifdef __DLL
 	switch (ul_reason_for_call)
     {
         case DLL_PROCESS_ATTACH:
@@ -41,8 +45,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			//std::cout << "Detached (Process)" << std::endl;
 			break;
     }
+#endif
 
-	
+
+#ifdef __EXE
+	Engine::Application app(true);
+	app.UCICommandLoop();
+#endif
    
 	// Position p;
 	// Position::set("r3kb1Q/pp3p1p/2p5/8/2b1q3/Pn6/5PPP/1R4K1 w q", p);

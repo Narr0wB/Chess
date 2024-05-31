@@ -37,30 +37,53 @@ class TranspositionTable {
         Transposition* m_DataArray;
 
         // The number of transpositions slots available per specific hash (in case of a collision)
-        const uint8_t m_BucketSize = 1;
+        uint8_t m_BucketSize = 1;
 
-        // Maximum number of transpositions that could be stored in the table
-        const uint32_t m_Capacity;
+        // Maximum number of transpositions that can be stored in the table
+        uint32_t m_Capacity;
 
         // Number of transpositions currently stored in the table
         size_t m_Size;
 
-        int& hits;
+    public:
+        // Transposition table hits
+        int hits;
 
     public:
-        TranspositionTable(uint32_t capacity, int& hits) : m_Capacity(capacity), m_Size(0), hits(hits) {
+        TranspositionTable(uint32_t capacity) : m_Capacity(capacity), m_Size(0), hits(0) {
             m_DataArray = new Transposition[capacity * m_BucketSize];
             std::memset(m_DataArray, 0, sizeof(Transposition) * m_Capacity * m_BucketSize);
+        }
+
+        TranspositionTable() {};
+
+        // Move constructor
+        TranspositionTable(TranspositionTable&& tt) : 
+        m_DataArray(tt.m_DataArray),
+        m_BucketSize(tt.m_BucketSize),
+        m_Size(tt.m_Size),
+        hits(tt.hits) {}
+
+        // Move assignment operator
+        TranspositionTable& operator=(TranspositionTable&& tt) {
+            m_DataArray = (tt.m_DataArray);
+            m_BucketSize = (tt.m_BucketSize);
+            m_Size = (tt.m_Size);
+            hits = (tt.hits);
+
+            return *this;
         }
 
         ~TranspositionTable() {
             delete m_DataArray;
         }
 
+        inline uint32_t size() { return m_Size; };
+        void realloc(size_t numberOfTranspositions);
+        void clear();
+
         void push_position(Transposition t);
         Transposition probe_hash(uint64_t hash, int alpha, int beta, int depth);
-
-        inline uint32_t size() { return m_Size; };
 };
 
 #endif

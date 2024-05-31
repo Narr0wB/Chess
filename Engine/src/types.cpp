@@ -133,8 +133,8 @@ const char* MOVE_TYPESTR[16] = {
 };
 
 const char* MOVE_TYPESTR_B[16] = {
-	"", "", " O-O", " O-O-O", " N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)", " (capture)", "", " e.p.", "",
-	" N (promotion)", " B (promotion)", " R (promotion)", " Q (promotion)"
+	"", "", " O-O", " O-O-O", "n", "b", "r", "q", " (capture)", "", " e.p.", "",
+	"n", "b", "r", "q"
 };
 
 //Prints the move
