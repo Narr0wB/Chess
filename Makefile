@@ -1,63 +1,31 @@
-CC = g++
-INCLUDE = -I./include
-LIBPATH =
-LIB =
-COPTIONS = -g -O3
-TARGETDLL = build/Engine.dll
-TARGETEXE = build/Engine.exe
-TARGETDEF = 0
+BASE = $(shell pwd)
+UNAME = $(shell uname -s)
 
-EXE = 1
+export SRCDIR  = $(BASE)/src
+export OUTDIR  = $(BASE)/bin
+export INCLUDE = $(BASE)/include/
 
-ifeq ($(EXE), 1)
-	TARGET = $(TARGETEXE)
-	TARGETDEF = -D__EXE=1
-else
-	TARGET = $(TARGETDLL)
-	COPTIONS = -g -O3 -shared
-	TARGETDEF = -D__DLL=1
-endif
+setup: 
+	@mkdir -p $(OUTDIR) 
 
-OBJS = build/EntryPoint.o build/Engine.o build/Log.o build/Transposition.o build/Evaluate.o build/types.o build/tables.o build/position.o \
-build/Search.o build/misc.o build/thread.o
+export CC = g++
+export LD = ld
+export DEBUG = -g
+export CCFLAGS = $(DEGUG) -O3 -std=c++20
 
-$(TARGET): $(OBJS)
-	$(CC) $(COPTIONS) $(OBJS) -o $(TARGET) $(LIB)
+TARGET = $(OUTDIR)/Engine
 
-build/EntryPoint.o: Engine/src/EntryPoint.cpp Engine/src/Engine.h Engine/src/Evaluate.h
-	$(CC) $(INCLUDE) $(COPTIONS) $(TARGETDEF) -c $< -o $@
- 
-build/Engine.o: Engine/src/Engine.cpp Engine/src/Engine.h Engine/src/search.h Engine/src/position.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+objs:
+	make -C $(SRCDIR)/movegen
+	make -C $(SRCDIR)/search
+	make -C $(SRCDIR)/uci
+	make -C $(SRCDIR)
 
-build/Search.o: Engine/src/search.cpp Engine/src/search.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+$(TARGET): objs
+	$(CC) $(OUTDIR)/*.o -o $(TARGET)
 
-build/Log.o: Engine/src/Log.cpp Engine/src/Log.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/Transposition.o: Engine/src/Transposition.cpp Engine/src/Transposition.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/Evaluate.o: Engine/src/Evaluate.cpp Engine/src/Evaluate.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/types.o: Engine/src/types.cpp Engine/src/types.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/tables.o: Engine/src/tables.cpp Engine/src/tables.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/position.o: Engine/src/position.cpp Engine/src/position.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/misc.o: Engine/src/misc.cpp Engine/src/misc.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
-
-build/thread.o: Engine/src/thread.cpp Engine/src/thread.h
-	$(CC) $(INCLUDE) $(COPTIONS) -c $< -o $@
+build: setup $(TARGET)
 
 clean:
 	rm build/*.o
-	powershell rm build/*.o
 
