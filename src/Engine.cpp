@@ -6,7 +6,6 @@
 // #define MAX_INSTANCES 10
 
 namespace Engine {
-
 	void Optimize(SearchInfo& info, int time, int inc) {
 		if (time < 0) time = 5000;
 
@@ -21,7 +20,7 @@ namespace Engine {
 
 		// If we are given how much time a player has left and how many more moves should the player make
 		else if (info.timeset && info.movestogo != 0) {
-			const float time_per_move = time / info.movestogo;
+			const float time_per_move = (int)(time / info.movestogo);
 			// Never use more than 80% of the available time for a move
 			const float max_time_bound = 0.8f * time;
 			const float max_time = std::min(0.8f * time_per_move, max_time_bound);

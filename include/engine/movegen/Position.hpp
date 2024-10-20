@@ -67,11 +67,14 @@ struct UndoInfo {
 	//double pushed on the previous move
 	Square epsq;
 
-	constexpr UndoInfo() : entry(0), captured(NO_PIECE), epsq(NO_SQUARE) {}
+    // The hash of the current position being saved
+    uint64_t hash;
+
+	constexpr UndoInfo() : entry(0), captured(NO_PIECE), epsq(NO_SQUARE), hash(0) {}
 	
 	//This preserves the entry bitboard across moves
 	UndoInfo(const UndoInfo& prev) : 
-		entry(prev.entry), captured(NO_PIECE), epsq(NO_SQUARE) {}
+		entry(prev.entry), captured(NO_PIECE), epsq(NO_SQUARE), hash(0) {}
 };
 
 class Position {
@@ -576,6 +579,8 @@ void Position::play(const Move m) {
 		
 		break;
 	}
+
+    history[game_ply].hash = get_hash();
 }
 
 //Undos a move in the current position, rolling it back to the previous position

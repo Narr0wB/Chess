@@ -181,6 +181,19 @@ int negamax(std::shared_ptr<SearchContext> ctx, int Aalpha, int Bbeta, int depth
     }
     
     Transposition node_ = Transposition{FLAG_ALPHA, ctx->board.get_hash(), (uint8_t)depth, NO_SCORE, NO_MOVE};
+    
+    int repetitions = 0;
+    for (int i = ctx->board.ply() - 2; i >= 0; i -= 2) {
+        // If we are above the root ply, and we find a position that has been played before during our search
+        // then that means that most likely this will be repeated, leading to a three fold repetition draw
+        // or if we just find 3 repetitions (including from before root positions) (we have 3 repetitions
+        // because we have found 2 + the one we are currently analyzing)
+          
+        if (ctx->board.get_hash() == ctx->board.history[i].hash &&
+            (i > ctx->board.ply() - ply || ++repetitions == 2)) {
+            return 0;
+        }
+    }
 
     MoveList<C> mL(ctx->board);
 

@@ -18,7 +18,7 @@ class SearchWorker {
         ThreadState m_State;
 
     public:
-        SearchWorker(std::string& log) : m_State(ThreadState::IDLE) {
+        SearchWorker() : m_State(ThreadState::IDLE) {
 
         }
 

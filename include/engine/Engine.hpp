@@ -22,10 +22,6 @@
 using namespace std::chrono_literals;
 
 namespace Engine {
-	// typedef uint8_t u8;
-	// typedef uint16_t u16;
-	// #define ENGINE_API __declspec(dllexport)
-
 	// static const char* COMMAND_STR_B[] = {"NONE", "SET", "MOVE", "UNDO", "MOVEREQ", "GENMOVES", "CHECK", "CHECKMATE", "FEN", "COLOR"};
 
 	// enum CommandType : uint16_t {
@@ -80,8 +76,6 @@ namespace Engine {
 			
 			bool m_Debug;
 			bool m_ShouldClose;
-			std::string m_DebugLog;
-
 			SearchWorker m_SearchWorker;
 			std::shared_ptr<SearchContext> m_SearchContext;
 			UCIOptions m_Options;
@@ -99,7 +93,7 @@ namespace Engine {
 			Application(bool debug) : 
 			m_Debug(debug),  
 			m_ShouldClose(false), 
-			m_SearchWorker(m_DebugLog),
+			m_SearchWorker(),
 			m_Table(new TranspositionTable(0x1000000)),
       m_SearchContext(new SearchContext())
 			{ 
@@ -113,19 +107,9 @@ namespace Engine {
 			~Application() { m_SearchWorker.Stop(); }
 			
 
-			// UCI communication
-			// Takes control of the application (when used must be compiled to a binary executable)
 			void UCICommandLoop();
 	};
 
 } // namespace Engine
-
-// extern "C" {
-// 	ENGINE_API bool CreateInstance(Engine::u16 instance_id, bool debug_console);
-// 	ENGINE_API bool DestroyInstance(Engine::u16 instance_id);
-// 	ENGINE_API bool ExistsInstance(Engine::u16 instance_id);
-// 	ENGINE_API Engine::Response RequestCommand(Engine::u16 iid, Engine::Command cmd);
-// 	ENGINE_API char* DebugData(Engine::u16 iid);
-// }
 
 #endif // ENGINE_H
