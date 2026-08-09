@@ -2,7 +2,7 @@
 #ifndef PARAMETERS_HPP
 #define PARAMETERS_HPP
 
-#define MAX_DEPTH 25
+#define MAX_DEPTH 27
 #define MAX_PLY   30 
 
 /* Search */
@@ -33,7 +33,7 @@ constexpr int delta_margin = 100;
 
 /* Late move reductions */
 constexpr int lmr_depth     = 4;
-constexpr int lmr_movecount = 4;
+constexpr int lmr_movecount = 2;
 
 /* Movepicker */
 constexpr int good_quiet_threshold   = -1;

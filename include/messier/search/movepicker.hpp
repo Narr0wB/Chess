@@ -276,7 +276,7 @@ private:
     {
         static_assert(type == GenType::CAPTURES || type == GenType::QUIETS || type == GenType::EVASIONS || type == GenType::QUIESCENCE, "Incorrect type");
 
-        Bitboard threat_by_lesser[NPIECE_TYPES] = {0}; 
+        // Bitboard threat_by_lesser[NPIECE_TYPES] = {0}; 
         // if constexpr (type == GenType::QUIETS) {
         //     threat_by_lesser[PAWN] = 0;
         //     threat_by_lesser[KNIGHT] = threat_by_lesser[BISHOP] = m_pos.attacks_by<PAWN, ~C>(); 
@@ -290,15 +290,18 @@ private:
             ExtMove& m = *it++;
             m = move;
 
-            const Square    from     = m.from();
-            const Square    to       = m.to();
-            const Piece     pc       = m_pos.at(from);
-            const PieceType pt       = type_of(pc);
-            const Piece     captured = m.is_enpassant() ? m_pos.at(to + relative_dir<C>(SOUTH)) : m_pos.at(to);
+            const Square    from       = m.from();
+            const Square    to         = m.to();
+            const Piece     pc         = m_pos.at(from);
+            const PieceType pt         = type_of(pc);
+            const Piece     captured   = m.is_enpassant() ? m_pos.at(to + relative_dir<C>(SOUTH)) : m_pos.at(to);
+            const bool      is_capture = m.is_capture();
 
-            if constexpr (type == GenType::CAPTURES) {
-                PieceType captured_type = captured == NO_PIECE ? PAWN : type_of(captured);
-                m.score = mvv_lva_lookup[type_of(pc)][captured_type];
+            if constexpr (type == GenType::CAPTURES || type == GenType::QUIESCENCE) {
+                if (is_capture) {
+                    m.score = mvv_lva_lookup[type_of(pc)][type_of(captured)];
+                    m.score += m_ctx.capture.board[pc][type_of(captured)][to];
+                }
             }
 
             else if constexpr (type == GenType::QUIETS) {
@@ -315,18 +318,14 @@ private:
                 // m.score += piece_value[pt] * v;
             }
 
-            else if constexpr (type == GenType::QUIESCENCE) {
-                if (m.is_capture()) {
-                    PieceType captured_type = captured == NO_PIECE ? PAWN : type_of(captured);
-                    m.score = mvv_lva_lookup[type_of(pc)][captured_type];
+            if constexpr (type == GenType::EVASIONS) {
+                if (is_capture) {
+                    m.score = (1 << 18) + mvv_lva_lookup[type_of(pc)][type_of(captured)];
+                    m.score += m_ctx.capture.board[pc][type_of(captured)][to];
                 }
-            }
-
-            else if constexpr (type == GenType::EVASIONS) {
-                if (m.is_capture())
-                    m.score = (1 << 20) + mvv_lva_lookup[pt][type_of(captured)];
-                else 
+                else {
                     m.score = m_ctx.quiet.board[from][to][static_cast<size_t>(C)];
+                }
             }
 
             if (m.is_promotion())

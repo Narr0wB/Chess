@@ -129,10 +129,6 @@ namespace Search {
     template <Color C, bool PVnode>
     int Worker::quiescence(Position& pos, SearchStack* ss, int Aalpha, int Bbeta) 
     {
-        if (ss->ply != ss->qply)
-            m_info.nodes++;
-        m_info.qnodes++;
-
         if (exit_search()) 
             return 0;
         
@@ -171,23 +167,17 @@ namespace Search {
         Transposition node(FLAG_ALPHA, hash, 0, NO_SCORE, NO_SCORE, Move::none(), m_info.generation);
 
         if (!ss->in_check) {
+            ss->static_eval = node.eval = node.score = best_score = (tt_eval != NO_SCORE) ?  tt_eval : corrected_eval<C>(pos); 
+
             // Stand pat, check if current position is already better than Beta (or atleast better than alfa)
-            ss->static_eval = node.eval = (tt_eval != NO_SCORE) ?  tt_eval : corrected_eval<C>(pos); 
-            best_score = node.score = ss->static_eval;
-
-            if (best_score > Aalpha) {
-                node.flags = FLAG_EXACT;
-                Aalpha = best_score;
-
-                if (best_score >= Bbeta) {
-                    node.flags = FLAG_BETA;
-                    m_tt.push(hash, node);
-                    return best_score;
-                }
+            if (best_score >= Bbeta) {
+                node.flags = FLAG_BETA;
+                m_tt.push(hash, node);
+                return best_score;
             }
         }
         else {
-            ss->static_eval = node.eval = NO_SCORE;
+            ss->static_eval = NO_SCORE;
         }
         
         if (ss->ply >= MAX_PLY - 1) 
@@ -212,6 +202,10 @@ namespace Search {
 
             pos.play<C>(m);
 
+            // Actual node count
+            m_info.nodes++;
+            m_info.qnodes++;
+
             (ss + 1)->qply = ss->qply;
             score = -quiescence<~C, PVnode>(pos, ss + 1, -Bbeta, -Aalpha);
 
@@ -232,7 +226,6 @@ namespace Search {
 
                 if (score > Aalpha) {
                     Aalpha = best_score;
-                    node.flags = FLAG_EXACT;
 
                     if (score >= Bbeta) {
                         node.flags = FLAG_BETA;
@@ -259,8 +252,6 @@ namespace Search {
     template <Color C, bool PVnode>
     int Worker::search(Position& pos, SearchStack *ss, int Aalpha, int Bbeta, int depth) 
     {
-        m_info.nodes++;
-
         int ply = ss->ply;
         int score = 0;
         int best_score = -INFTY;
@@ -387,7 +378,10 @@ namespace Search {
         Transposition node(FLAG_ALPHA, hash, (int8_t)depth, NO_SCORE, ss->static_eval, tt_move, m_info.generation);
 
         Move quiets_searched[MAX_MOVES];
+        Move captures_searched[MAX_MOVES];
         int quiets_count = 0;
+        int captures_count = 0;
+
         int move_count = 0;
         int searched_count = 0;
 
@@ -401,7 +395,8 @@ namespace Search {
 
             move_count++;
 
-            const bool is_quiet = m.is_quiet();
+            const bool is_quiet    = m.is_quiet();
+            const bool is_capture  = m.is_capture();
             const bool gives_check = pos.gives_check<C>(m);
 
             // const bool prunable_capture = 
@@ -439,6 +434,7 @@ namespace Search {
             //     continue;
 
             searched_count++;
+            m_info.nodes++;
 
             pos.play<C>(m);
 
@@ -475,6 +471,8 @@ namespace Search {
 
             if (is_quiet)
                 quiets_searched[quiets_count++] = m;
+            else if (is_capture)
+                captures_searched[captures_count++] = m;
 
             if (exit_search()) 
                 return 0;
@@ -496,18 +494,33 @@ namespace Search {
 
                     // Fail High Node, i.e. we have found a move that is better than what our opponent is guaranteed to take
                     if (best_score >= Bbeta) {
+                        const int bonus = std::min(MAX_HISTORY, 300 * depth - 250);
+
                         if (is_quiet) {
                             if (m != m_ctx.killer.moves[ply][0]) {
                                 m_ctx.killer.moves[ply][1] = m_ctx.killer.moves[ply][0];
                                 m_ctx.killer.moves[ply][0] = m;
                             }
 
-                            const int bonus = std::min(MAX_HISTORY, 300 * depth - 250);
-
                             m_ctx.quiet.update_history<C>(m, bonus);
-
-                            for (size_t i = 0; i < quiets_count - 1; ++i)
+                            for (int i = 0; i < quiets_count - 1; ++i)
                                 m_ctx.quiet.update_history<C>(quiets_searched[i], -bonus);
+                        }
+                        else if (is_capture) {
+                            Square from        = m.from();
+                            Square to          = m.to();
+                            Piece hunter       = pos.at(from);
+                            PieceType captured = m.is_enpassant() ? PAWN : type_of(pos.at(to));
+
+                            m_ctx.capture.update_history(hunter, captured, to, bonus);
+                            for (int i = 0; i < captures_count - 1; ++i) {
+                                from     = captures_searched[i].from();
+                                to       = captures_searched[i].to();
+                                captured = captures_searched[i].is_enpassant() ? PAWN : type_of(pos.at(to));
+                                hunter   = pos.at(from);
+
+                                m_ctx.capture.update_history(hunter, captured, to, -bonus);
+                            }
                         }
 
                         node.flags = FLAG_BETA;

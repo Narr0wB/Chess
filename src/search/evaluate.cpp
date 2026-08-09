@@ -170,6 +170,7 @@ int evaluate(const Position& position)
     int mg_score = 0;
     int eg_score = 0;
     int phase    = 0;
+    int mobility_score = 0;
 
     for (PieceType p = PAWN; p <= KING; ++p) {
         Bitboard white_piece_bb = position.bitboard_of(make_piece(WHITE, p));

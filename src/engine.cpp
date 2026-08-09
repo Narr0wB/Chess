@@ -171,7 +171,6 @@ namespace Engine {
 
 			if (tokens.at(2) == "Hash") {
 				size_t table_size = std::stoi(tokens.at(4));
-				std::cout << "Setting hash table size to " << table_size << "MB" << std::endl;
 
 				m_options.hash_table_size_mb = table_size;
 				m_table.clear();

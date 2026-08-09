@@ -50,6 +50,7 @@ namespace Search {
 
     struct SearchContext {
         QuietHistory quiet;
+        CaptureHistory capture;
         KillerHistory killer;
     };
 

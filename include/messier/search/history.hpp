@@ -9,7 +9,7 @@
 #define MAX_HISTORY 8000
 
 struct QuietHistory {
-    int board[64][64][2];
+    int board[NSQUARES][NSQUARES][NCOLORS];
 
     template <Color C> inline void update_history(const Move& m, int bonus) 
     {
@@ -20,15 +20,19 @@ struct QuietHistory {
 };
 
 struct KillerHistory {
-    Move moves[MAX_TABLE][2];
-};
-
-struct ButterflyHistory {
-
+    Move moves[MAX_TABLE][NCOLORS];
 };
 
 struct CaptureHistory {
+    int board[NPIECES][NPIECE_TYPES][NSQUARES];
 
+    inline void update_history(Piece hunter, PieceType captured, Square sq, int bonus) 
+    {
+        int clamped_bonus = std::clamp(bonus, -MAX_HISTORY, MAX_HISTORY);
+
+        board[hunter][captured][sq]
+            += clamped_bonus - board[hunter][captured][sq] * std::abs(clamped_bonus) / MAX_HISTORY;
+    }
 };
 
 struct ContinuationHistory {
