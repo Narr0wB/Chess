@@ -135,11 +135,11 @@ namespace Search {
         uint64_t hash = pos.get_hash();
 
         auto [tt_hit, tte] = m_tt.probe(hash);
-        int tt_eval        = tte.eval;
-        Move tt_move       = tte.move;
-        int tt_score       = tte.score;
-        uint8_t tt_bound   = tte.flags;
-        int8_t tt_depth    = tte.depth;
+        int tt_eval        = tt_hit ? tte->eval : NO_SCORE;
+        int tt_score       = tt_hit ? tte->score : NO_SCORE;
+        Move tt_move       = tt_hit ? tte->move : Move::none();
+        uint8_t tt_bound   = tt_hit ? tte->flags : FLAG_EMPTY;
+        int8_t tt_depth    = tt_hit ? tte->depth : 0;
 
         if (tt_hit && tt_score >= MATE_SCORE - MAX_PLY) 
             tt_score -= ss->ply; 
@@ -184,7 +184,7 @@ namespace Search {
             return best_score != -INFTY ? best_score : corrected_eval<C>(pos);
 
 
-        MovePicker<C> picker(pos, m_ctx, ss->ply, -1, ss->in_check, tt_move);
+        MovePicker<C> picker(pos, m_ctx, ss, ss->ply, -1, ss->in_check, tt_move);
         while ((m = picker.next()) != Move::none()) {
             move_count++;
 
@@ -200,11 +200,13 @@ namespace Search {
                     continue;
             }
 
-            pos.play<C>(m);
-
             // Actual node count
             m_info.nodes++;
             m_info.qnodes++;
+            ss->move = m;
+            ss->moved = type_of(pos.at(m.from()));
+
+            pos.play<C>(m);
 
             (ss + 1)->qply = ss->qply;
             score = -quiescence<~C, PVnode>(pos, ss + 1, -Bbeta, -Aalpha);
@@ -295,11 +297,11 @@ namespace Search {
         }
 
         auto [tt_hit, tte] = m_tt.probe(hash);
-        int tt_eval        = tte.eval;
-        Move tt_move       = tte.move;
-        int tt_score       = tte.score;
-        uint8_t tt_bound   = tte.flags;
-        int8_t tt_depth    = tte.depth;
+        int tt_eval        = tt_hit ? tte->eval : NO_SCORE;
+        int tt_score       = tt_hit ? tte->score : NO_SCORE;
+        Move tt_move       = tt_hit ? tte->move : Move::none();
+        uint8_t tt_bound   = tt_hit ? tte->flags : FLAG_EMPTY;
+        int8_t tt_depth    = tt_hit ? tte->depth : 0;
 
         if (tt_hit && tt_score >= MATE_SCORE - MAX_PLY) 
             tt_score -= ss->ply; 
@@ -324,17 +326,24 @@ namespace Search {
             ss->static_eval = (tt_eval != NO_SCORE) ? tt_eval : corrected_eval<C>(pos); 
 
             /* Razoring */
-            int margin = razoring_base * std::max(0, depth);
+            int margin = razoring_base * depth;
             if (!PVnode
                 && depth <= razoring_depth
                 && ss->static_eval + margin < Aalpha)
             {
                 (ss + 1)->qply = ply;
-                int qscore = quiescence<C, PVnode>(pos, ss + 1, Aalpha, Bbeta);
+                int qscore = quiescence<C, false>(pos, ss + 1, Aalpha - 1, Aalpha);
                 if (qscore <= Aalpha) return qscore;
             }
 
-            // Null Move Pruning
+            /* Reverse futility pruning */
+            margin = rfp_base_margin * depth;
+            if (!PVnode
+                && depth <= rfp_depth
+                && ss->static_eval - margin >= Bbeta)
+                return (ss->static_eval + Bbeta)/2;
+
+            /* Null move pruning */
             if (!PVnode 
                 && depth >= nmp_depth 
                 && ss->static_eval >= Bbeta
@@ -342,7 +351,7 @@ namespace Search {
                 && !ss->null_move 
                 && (!tt_hit || tt_bound == FLAG_BETA || tt_score >= Bbeta))
             {
-                int NMPReduction = 4 + depth / 5 + std::min(2, (ss->static_eval - Bbeta) / 191);
+                int NMPReduction = 5 + depth / 5 + std::min(2, (ss->static_eval - Bbeta) / 191);
 
                 (ss + 1)->null_move = true;
                 pos.play_null_move();
@@ -385,7 +394,7 @@ namespace Search {
         int move_count = 0;
         int searched_count = 0;
 
-        MovePicker<C> picker(pos, m_ctx, ply, depth, ss->in_check, tt_move);
+        MovePicker<C> picker(pos, m_ctx, ss, ply, depth, ss->in_check, tt_move);
         while ((m = picker.next()) != Move::none()) {
             /* Explore a single branch of the main tree */
             if (m_cfg.searchmove != Move::none() 
@@ -424,7 +433,7 @@ namespace Search {
             // Futility pruning
             const bool futility_prunable = futility_candidate
                 && is_quiet
-                && move_count > 1;
+                && move_count > fp_movecount;
 
             if ((futility_prunable || lmp_prunable) && !gives_check)
                 continue;
@@ -435,6 +444,8 @@ namespace Search {
 
             searched_count++;
             m_info.nodes++;
+            ss->move = m;
+            ss->moved = type_of(pos.at(m.from()));
 
             pos.play<C>(m);
 
@@ -481,6 +492,7 @@ namespace Search {
                 best_score = score;
                 node.score = score;
                 node.move  = m;
+                ss->bestmove = m;
 
                 if (score >= MATE_SCORE - MAX_PLY)
                     node.score = score + ss->ply;
@@ -494,7 +506,10 @@ namespace Search {
 
                     // Fail High Node, i.e. we have found a move that is better than what our opponent is guaranteed to take
                     if (best_score >= Bbeta) {
-                        const int bonus = std::min(MAX_HISTORY, 300 * depth - 250);
+                        const int16_t bonus = std::min<int16_t>(MAX_HISTORY, 300 * depth - 250);
+                        Square from        = m.from();
+                        Square to          = m.to();
+                        Piece hunter       = pos.at(from);
 
                         if (is_quiet) {
                             if (m != m_ctx.killer.moves[ply][0]) {
@@ -502,14 +517,17 @@ namespace Search {
                                 m_ctx.killer.moves[ply][0] = m;
                             }
 
+                            if (ss->ply > 0 && !ss->null_move)
+                                m_ctx.cont_one.update_history((ss - 1)->moved, (ss - 1)->move.to(), type_of(hunter), to, bonus);
                             m_ctx.quiet.update_history<C>(m, bonus);
-                            for (int i = 0; i < quiets_count - 1; ++i)
+
+                            for (int i = 0; i < quiets_count - 1; ++i) {
                                 m_ctx.quiet.update_history<C>(quiets_searched[i], -bonus);
+                                if (ss->ply > 0 && !ss->null_move)
+                                    m_ctx.cont_one.update_history((ss - 1)->moved, (ss - 1)->move.to(), type_of(pos.at(quiets_searched[i].from())), quiets_searched[i].to(), -bonus);
+                            }
                         }
                         else if (is_capture) {
-                            Square from        = m.from();
-                            Square to          = m.to();
-                            Piece hunter       = pos.at(from);
                             PieceType captured = m.is_enpassant() ? PAWN : type_of(pos.at(to));
 
                             m_ctx.capture.update_history(hunter, captured, to, bonus);
@@ -574,7 +592,9 @@ namespace Search {
                 (m_ss + i)->ply         = i;
                 (m_ss + i)->qply        = 0;
                 (m_ss + i)->static_eval = 0;
-                (m_ss + i)->move_count  = 0;
+                (m_ss + i)->move        = Move::none();
+                (m_ss + i)->moved       = PieceType::NONE;
+                (m_ss + i)->bestmove    = Move::none();
                 (m_ss + i)->tt_hit      = false;
                 (m_ss + i)->in_check    = false;
                 (m_ss + i)->null_move   = false;
@@ -646,7 +666,7 @@ namespace Search {
                 std::cout << std::endl;
             }
 
-            best_move = m_pv[0];
+            best_move = m_ss->bestmove;
         }
 
         auto end_time = time_ms();
@@ -675,13 +695,13 @@ namespace Search {
 
             auto [tt_hit, tte] = table.probe(hash);
 
-            if (!tt_hit || tte.move == Move::none() || !pos.is_pseudo_legal(tte.move)) {
+            if (!tt_hit || tte->move == Move::none() || !pos.is_pseudo_legal(tte->move)) {
                 // LOG_INFO("Broken PV: {}, {}, {}, {}", tt_hit, tte.move, pos.is_pseudo_legal(tte.move), pos.turn());
                 break;
             }
 
-            out[cnt] = tte.move;
-            pos.play_dynamic(tte.move, C);
+            out[cnt] = tte->move;
+            pos.play_dynamic(tte->move, C);
             C = ~C;
         }
 

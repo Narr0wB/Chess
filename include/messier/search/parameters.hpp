@@ -2,19 +2,24 @@
 #ifndef PARAMETERS_HPP
 #define PARAMETERS_HPP
 
-#define MAX_DEPTH 27
-#define MAX_PLY   30 
+#define MAX_DEPTH 30
+#define MAX_PLY   35 
+
+/* Histories */
+constexpr int MAX_TABLE       = (MAX_PLY + 1);
+constexpr int16_t MAX_HISTORY = ((int16_t)(1 << 13));
 
 /* Search */
 constexpr int time_check_nodes      = 2048;
 constexpr int qsearch_see_threshold = 0;
 
 /* Futility pruning */
-constexpr int fp_depth  = 3;
-constexpr int fp_margin = 150;
+constexpr int fp_depth     = 3;
+constexpr int fp_margin    = 150;
+constexpr int fp_movecount = 1;
 
 /* Reverse futility pruning */
-constexpr int rfp_base_margin = 65;
+constexpr int rfp_base_margin = 75;
 constexpr int rfp_depth       = 3;
 
 /* Razoring */
@@ -33,11 +38,12 @@ constexpr int delta_margin = 100;
 
 /* Late move reductions */
 constexpr int lmr_depth     = 4;
-constexpr int lmr_movecount = 2;
+constexpr int lmr_movecount = 1;
 
 /* Movepicker */
 constexpr int good_quiet_threshold   = -1;
 constexpr int good_capture_threshold = 0;
 constexpr int moves_before_sorting   = 128;
+constexpr int sacrificial_check_threshold = -75;
 
 #endif // PARAMETERS_HPP

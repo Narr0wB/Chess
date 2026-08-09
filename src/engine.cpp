@@ -100,8 +100,11 @@ namespace Engine {
 		if (tokens[0] == "position") {
 			m_board.reset();
 
-			if (tokens[1] == "startpos") { Position::set(START_POSITION, m_board); } 
-			else if (tokens[1] == "fen") { Position::set(command.substr(command.find("fen") + 4, std::string::npos), m_board); }
+			if (tokens[1] == "startpos") 
+				Position::set(START_POSITION, m_board);
+
+			else if (tokens[1] == "fen") 
+				Position::set(command.substr(command.find("fen") + 4, std::string::npos), m_board);
 
 			if (command.find("moves") != std::string::npos) {
 				int string_start = command.find("moves") + 6;
@@ -302,11 +305,13 @@ namespace Engine {
 
 			auto [hit, entry] = m_table.probe(p.get_hash());
 
-			auto depth = entry.depth;
-			auto flags = entry.flags;
+			if (!hit)
+				return;
 
-			if (hit)
-				LOG_INFO("Root info:  Score: {}, Eval: {}, Move: {}, Flags: {}, Depth: {}", entry.score, entry.eval, entry.move, flags, depth);
+			auto depth = entry->depth;
+			auto flags = entry->flags;
+
+			LOG_INFO("Root info:  Score: {}, Eval: {}, Move: {}, Flags: {}, Depth: {}", entry->score, entry->eval, entry->move, flags, depth);
 
 			if (p.turn() == WHITE) {
 				MoveList<GenType::LEGAL, WHITE> ml(p);
@@ -314,11 +319,11 @@ namespace Engine {
 					p.play<WHITE>(move);
 					auto [hit, entry] = m_table.probe(p.get_hash());
 
-					auto depth = entry.depth;
-					auto flags = entry.flags;
+					auto depth = entry->depth;
+					auto flags = entry->flags;
 
 					if (hit)
-						LOG_INFO("Child info: Move: {} Score: {}, Eval: {}, Move: {}, Flags: {}, Depth: {}", move, entry.score, entry.eval, entry.move, flags, depth);
+						LOG_INFO("Child info: Move: {} Score: {}, Eval: {}, Move: {}, Flags: {}, Depth: {}", move, entry->score, entry->eval, entry->move, flags, depth);
 
 					p.undo<WHITE>(move);
 				}
@@ -329,11 +334,11 @@ namespace Engine {
 					p.play<BLACK>(move);
 					auto [hit, entry] = m_table.probe(p.get_hash());
 
-					auto depth = entry.depth;
-					auto flags = entry.flags;
+					auto depth = entry->depth;
+					auto flags = entry->flags;
 
 					if (hit)
-						LOG_INFO("Child info: Move: {} Score: {}, Eval: {}, Move: {}, Flags: {}, Depth: {}", move, entry.score, entry.eval, entry.move, flags, depth);
+						LOG_INFO("Child info: Move: {} Score: {}, Eval: {}, Move: {}, Flags: {}, Depth: {}", move, entry->score, entry->eval, entry->move, flags, depth);
 
 					p.undo<BLACK>(move);
 				}

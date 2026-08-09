@@ -43,7 +43,7 @@ enum Direction : int {
 
 const size_t NPIECE_TYPES = 6;
 enum PieceType : int {
-	PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+	PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, NONE
 };
 
 inline PieceType& operator++(PieceType& pt) { pt = static_cast<PieceType>(static_cast<int>(pt) + 1); return pt; }

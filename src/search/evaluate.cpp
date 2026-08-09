@@ -165,26 +165,36 @@ int phase_weight[NPIECE_TYPES] = {
     0
 };
 
+int mg_mobility[NPIECE_TYPES] = { 0, 4, 5, 2, 1, 0 };
+int eg_mobility[NPIECE_TYPES] = { 0, 3, 5, 5, 2, 0 };
+
 int evaluate(const Position& position) 
 {
     int mg_score = 0;
     int eg_score = 0;
     int phase    = 0;
-    int mobility_score = 0;
+
+    Bitboard white_occ = position.all_pieces<WHITE>();
+    Bitboard black_occ = position.all_pieces<BLACK>();
+    Bitboard occ = white_occ | black_occ;
 
     for (PieceType p = PAWN; p <= KING; ++p) {
         Bitboard white_piece_bb = position.bitboard_of(make_piece(WHITE, p));
         Bitboard black_piece_bb = position.bitboard_of(make_piece(BLACK, p));
-
 
         while (white_piece_bb) {   
             Square piece_sq = pop_lsb(&white_piece_bb);
 
             mg_score += mg_value[p];
             eg_score += eg_value[p];
-
             mg_score += mg_tables[p][piece_sq ^ 56];
             eg_score += eg_tables[p][piece_sq ^ 56];
+
+            if (p != PAWN && p != KING) {
+                int mob = pop_count(attacks(p, piece_sq, occ) & ~white_occ);
+                mg_score += mg_mobility[p] * mob;
+                eg_score += eg_mobility[p] * mob;
+            }
 
             phase += phase_weight[p];
         }
@@ -194,9 +204,14 @@ int evaluate(const Position& position)
 
             mg_score -= mg_value[p];
             eg_score -= eg_value[p];
-
             mg_score -= mg_tables[p][piece_sq];
             eg_score -= eg_tables[p][piece_sq];
+
+            if (p != PAWN && p != KING) {
+                int mob = pop_count(attacks(p, piece_sq, occ) & ~black_occ);
+                mg_score -= mg_mobility[p] * mob;
+                eg_score -= eg_mobility[p] * mob;
+            }
 
             phase += phase_weight[p];
         }

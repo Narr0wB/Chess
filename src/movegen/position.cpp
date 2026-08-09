@@ -78,9 +78,9 @@ std::string Position::fen() const {
 		<< (history[game_ply].entry & BLACK_OO_MASK ? "" : "k")
 		<< (history[game_ply].entry & BLACK_OOO_MASK ? "" : "q")
 		<< (history[game_ply].castling ? " " : "- ")
-		<< (history[game_ply].epsq == NO_SQUARE ? "-" : SQSTR[history[game_ply].epsq]);
-		// << " " << halfmove
-		// << " " << fullmove;
+		<< (history[game_ply].epsq == NO_SQUARE ? "-" : SQSTR[history[game_ply].epsq])
+		<< " " << halfmove
+		<< " " << fullmove;
 
 	return fen.str();
 }
@@ -124,6 +124,15 @@ void Position::set(const std::string& fen, Position& p) {
 				p.history[p.game_ply].entry &= ~BLACK_OOO_MASK;
 				p.history[p.game_ply].castling |= (1 << 0);
 				break;
+		}
+	}
+
+	for (int i = 0; i < NSQUARES; ++i) {
+		if (std::string(SQSTR[i]) == tokens[3]) {
+			Square epsq = static_cast<Square>(i);
+			p.history[p.game_ply].epsq = epsq;
+			p.hash ^= zobrist::enps_file[file_of(epsq)];
+			break;
 		}
 	}
 

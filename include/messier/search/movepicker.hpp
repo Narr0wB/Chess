@@ -60,9 +60,10 @@ struct ExtMove : public Move {
 template <Color C>
 class MovePicker {
 public:
-    MovePicker(Position& pos, const Search::SearchContext& ctx, int ply, int depth, bool in_check, Move tt_move) :
+    MovePicker(Position& pos, const Search::SearchContext& ctx, const Search::SearchStack* ss, int ply, int depth, bool in_check, Move tt_move) :
         m_pos(pos),
         m_ctx(ctx),
+        m_ss(ss),
         m_ply(ply),
         m_depth(depth),
         m_ttmove(tt_move),
@@ -228,6 +229,7 @@ public:
 private:
     Position&                    m_pos;
     const Search::SearchContext& m_ctx;
+    const Search::SearchStack*   m_ss;
     int                          m_ply;
     int                          m_depth;
     Move                         m_ttmove;
@@ -241,8 +243,9 @@ private:
 
     template <bool stop_on_rejection = false, typename Pred>
     Move select(Pred predicate) {
-        if (m_stage_counter == moves_before_sorting)
+        if (m_stage_counter == moves_before_sorting) {
             std::sort(m_cur, m_end_cur, std::greater<ExtMove>());
+        }
 
         for (; m_cur < m_end_cur; ++m_cur) {
             if (m_stage_counter < moves_before_sorting) {
@@ -264,9 +267,10 @@ private:
             }
             
             if constexpr (stop_on_rejection)
-                return Move::none();
+                break;
         }
             
+        m_stage_counter++;
         return Move::none();
     }
 
@@ -275,15 +279,6 @@ private:
     ExtMove* score(MoveList<type, C>& list)
     {
         static_assert(type == GenType::CAPTURES || type == GenType::QUIETS || type == GenType::EVASIONS || type == GenType::QUIESCENCE, "Incorrect type");
-
-        // Bitboard threat_by_lesser[NPIECE_TYPES] = {0}; 
-        // if constexpr (type == GenType::QUIETS) {
-        //     threat_by_lesser[PAWN] = 0;
-        //     threat_by_lesser[KNIGHT] = threat_by_lesser[BISHOP] = m_pos.attacks_by<PAWN, ~C>(); 
-        //     threat_by_lesser[ROOK] = threat_by_lesser[BISHOP] | m_pos.attacks_by<BISHOP, ~C>() | m_pos.attacks_by<KNIGHT, ~C>();
-        //     threat_by_lesser[QUEEN] = threat_by_lesser[ROOK] | m_pos.attacks_by<ROOK, ~C>();
-        //     threat_by_lesser[KING] = threat_by_lesser[QUEEN] | m_pos.attacks_by<QUEEN, ~C>();
-        // }
 
         ExtMove* it = m_cur;
         for (auto move : list) {
@@ -297,14 +292,12 @@ private:
             const Piece     captured   = m.is_enpassant() ? m_pos.at(to + relative_dir<C>(SOUTH)) : m_pos.at(to);
             const bool      is_capture = m.is_capture();
 
-            if constexpr (type == GenType::CAPTURES || type == GenType::QUIESCENCE) {
-                if (is_capture) {
-                    m.score = mvv_lva_lookup[type_of(pc)][type_of(captured)];
-                    m.score += m_ctx.capture.board[pc][type_of(captured)][to];
-                }
+            if constexpr (type == GenType::CAPTURES) {
+                m.score = mvv_lva_lookup[type_of(pc)][type_of(captured)];
+                m.score += m_ctx.capture.board[pc][type_of(captured)][to];
             }
 
-            else if constexpr (type == GenType::QUIETS) {
+            if constexpr (type == GenType::QUIETS) {
                 // History heuristic
                 m.score = m_ctx.quiet.board[from][to][static_cast<size_t>(C)];
 
@@ -312,19 +305,22 @@ private:
                 m.score += m_ctx.killer.moves[m_ply][0] == m ? (1 << 16) : 0;
                 m.score += m_ctx.killer.moves[m_ply][1] == m ? (1 << 16) - 1 : 0;
 
-                // Assign a bonus for escaping a threat by a lesser piece
-                // int v = (threat_by_lesser[pt] & (1ULL << to)) ? 
-                //     -30 : 40 * bool((threat_by_lesser[pt] & (1ULL << from)));
-                // m.score += piece_value[pt] * v;
+                if (m_ply > 0 && !m_ss->null_move)
+                    m.score += m_ctx.cont_one.board[(m_ss - 1)->moved * NSQUARES + (m_ss - 1)->move.to()][pt * NSQUARES + to];
+
+                // if (m_pos.gives_check<C>(m))
+                //     m.score += 1 << 13;
             }
 
-            if constexpr (type == GenType::EVASIONS) {
+            if constexpr (type == GenType::EVASIONS || type == GenType::QUIESCENCE) {
                 if (is_capture) {
-                    m.score = (1 << 18) + mvv_lva_lookup[type_of(pc)][type_of(captured)];
+                    m.score = (1 << 13) + mvv_lva_lookup[type_of(pc)][type_of(captured)];
                     m.score += m_ctx.capture.board[pc][type_of(captured)][to];
                 }
                 else {
                     m.score = m_ctx.quiet.board[from][to][static_cast<size_t>(C)];
+                    if (m_ply > 0 && !m_ss->null_move)
+                        m.score += m_ctx.cont_one.board[(m_ss - 1)->moved * NSQUARES + (m_ss - 1)->move.to()][pt * NSQUARES + to];
                 }
             }
 

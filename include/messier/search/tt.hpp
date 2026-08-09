@@ -18,6 +18,8 @@
 #define NO_SCORE   (INFTY + 1)
 
 #define GENERATION_MASK 0b111111
+#define HASH_MASK       0xFFFFFFFF
+#define CLUSTER_SIZE    4
 
 struct Transposition {
     uint32_t hash;
@@ -31,12 +33,12 @@ struct Transposition {
     Transposition() = default;
 
     Transposition(uint8_t f, uint64_t h, int8_t d, int sc, int e, Move m, uint8_t gen) : 
-    flags(f), hash(h & 0xFFFFFFFFU), depth(d), score(sc), move(m), eval(e), generation(gen) {};
+    flags(f), hash(h & HASH_MASK), depth(d), score(sc), move(m), eval(e), generation(gen) {};
 };
 
-using Cluster = std::array<Transposition, 3>;
+using Cluster = std::array<Transposition, CLUSTER_SIZE>;
 
-#define NO_HASH_ENTRY { FLAG_EMPTY, 0, 0, NO_SCORE, NO_SCORE, Move::none(), 0 }
+// #define NO_HASH_ENTRY { FLAG_EMPTY, 0, 0, NO_SCORE, NO_SCORE, Move::none(), 0 }
 #define DEFAULT_CAPACITY (1ULL << 20)
 #define MAX_CAPACITY (1ULL << 25)
 
@@ -67,7 +69,7 @@ class TTable {
         inline void clear();
 
         inline void push(uint64_t hash, const Transposition& t);
-        inline std::tuple<bool, Transposition> probe(uint64_t hash) const;
+        inline std::tuple<bool, const Transposition*> probe(uint64_t hash) const;
 };
 
 inline void TTable::push(uint64_t hash, const Transposition& t)
@@ -78,7 +80,7 @@ inline void TTable::push(uint64_t hash, const Transposition& t)
     int age       = -1;
     int depth     = INT32_MAX;
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < CLUSTER_SIZE; ++i) {
         if (c[i].flags == FLAG_EMPTY) {
             candidate = i;
             m_stored++;
@@ -107,15 +109,15 @@ inline void TTable::push(uint64_t hash, const Transposition& t)
         c[candidate] = t;
 }
 
-inline std::tuple<bool, Transposition> TTable::probe(uint64_t hash) const
+inline std::tuple<bool, const Transposition*> TTable::probe(uint64_t hash) const
 {
     const Cluster& c = m_map[mul_hi64(hash, m_map.size())];
 
-    for (int i = 0; i < 3; ++i)
-        if (c[i].hash == (hash & 0xFFFFFFFFU))
-            return {true, c[i]};
+    for (int i = 0; i < CLUSTER_SIZE; ++i)
+        if (c[i].hash == (hash & HASH_MASK))
+            return {true, &c[i]};
 
-    return {false, NO_HASH_ENTRY};
+    return {false, nullptr};
 }
 
 inline void TTable::clear()

@@ -42,7 +42,9 @@ namespace Search {
         int  ply;
         int  qply;
         int  static_eval;
-        int  move_count;
+        Move move;
+        PieceType moved;
+        Move bestmove;
         bool in_check;
         bool tt_hit;
         bool null_move;
@@ -52,6 +54,8 @@ namespace Search {
         QuietHistory quiet;
         CaptureHistory capture;
         KillerHistory killer;
+
+        ContinuationHistory cont_one;
     };
 
     enum class WorkerState {
