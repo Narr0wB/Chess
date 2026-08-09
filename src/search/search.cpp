@@ -173,27 +173,18 @@ namespace Search {
         if (!ss->in_check) {
             // Stand pat, check if current position is already better than Beta (or atleast better than alfa)
             ss->static_eval = node.eval = (tt_eval != NO_SCORE) ?  tt_eval : corrected_eval<C>(pos); 
+            best_score = node.score = ss->static_eval;
 
-            best_score = ss->static_eval;
-            node.score = best_score;
-
-            if (best_score >= Bbeta) {
-                node.flags = FLAG_BETA;
-                m_tt.push(hash, node);
-                return best_score;
-            }
             if (best_score > Aalpha) {
-                node.flags = FLAG_ALPHA;
+                node.flags = FLAG_EXACT;
                 Aalpha = best_score;
-            }
 
-            // // Futility pruning
-            // if (!PVnode && ss->static_eval + piece_value[QUEEN] < Aalpha) {
-            //     node.flags = FLAG_ALPHA;
-            //     node.score = ss->static_eval + piece_value[QUEEN];
-            //     m_tt.push(pos.get_hash(), node);
-            //     return node.score;   
-            // }
+                if (best_score >= Bbeta) {
+                    node.flags = FLAG_BETA;
+                    m_tt.push(hash, node);
+                    return best_score;
+                }
+            }
         }
         else {
             ss->static_eval = node.eval = NO_SCORE;
@@ -356,14 +347,19 @@ namespace Search {
             if (!PVnode 
                 && depth >= nmp_depth 
                 && ss->static_eval >= Bbeta
-                && pos.npm(C) >= nmp_npawn_material
+                && pos.npm(C) > nmp_npawn_material
+                && !ss->null_move 
                 && (!tt_hit || tt_bound == FLAG_BETA || tt_score >= Bbeta))
             {
                 int NMPReduction = 4 + depth / 5 + std::min(2, (ss->static_eval - Bbeta) / 191);
 
+                (ss + 1)->null_move = true;
                 pos.play_null_move();
+
                 int v = -search<~C, false>(pos, ss + 1, -Bbeta, -Bbeta + 1, depth - NMPReduction);
+
                 pos.undo_null_move();
+                (ss + 1)->null_move = false;
 
                 if (v >= Bbeta)
                     return v >= MATE_SCORE - MAX_PLY ? Bbeta : v;
@@ -376,12 +372,13 @@ namespace Search {
                 depth -= 1;
         }
 
-        // Reverse Futility Pruning: if at frontier nodes we realize that the static evaluation of our position, 
+        // Futility Pruning: if at frontier nodes we realize that the static evaluation of our position, 
         // even after adding some margin, is still under alpha then prune this node by returning the static evaluation  
+        int margin = fp_margin * depth;
         const bool futility_candidate = !PVnode 
             && !ss->in_check
             && depth <= fp_depth 
-            && ss->static_eval + fp_margin <= Aalpha;
+            && ss->static_eval + margin <= Aalpha;
 
         const bool improving = ss->ply >= 2 
             && !ss->in_check 
@@ -405,6 +402,7 @@ namespace Search {
             move_count++;
 
             const bool is_quiet = m.is_quiet();
+            const bool gives_check = pos.gives_check<C>(m);
 
             // const bool prunable_capture = 
             //     !PVnode
@@ -428,12 +426,12 @@ namespace Search {
                 && depth <= 3 
                 && move_count > lmp_margin[improving][depth];
 
-            // Futility pruning (TODO: add gives_check check)
+            // Futility pruning
             const bool futility_prunable = futility_candidate
                 && is_quiet
                 && move_count > 1;
 
-            if ((futility_prunable || lmp_prunable) && !pos.gives_check<C>(m))
+            if ((futility_prunable || lmp_prunable) && !gives_check)
                 continue;
 
             // Shallow SEE pruning
@@ -452,20 +450,17 @@ namespace Search {
                 // Late Move Reductions
                 const int new_depth = depth - 1;
 
-                if (depth >= 4 && move_count > 4 && is_quiet)
+                if (depth >= lmr_depth 
+                    && !ss->in_check
+                    && searched_count > lmr_movecount
+                    && !gives_check)
                 {
                     int reduction = lmr_reductions[depth][std::min(move_count, 63)];
+                    reduction = std::max(reduction, 1);
 
-                    reduction -= pos.in_check<~C>();
-                    reduction -= PVnode;
-                    reduction -= ss->in_check;
-                    reduction = std::clamp(reduction, 0, new_depth);
+                    score = -search<~C, false>(pos, ss + 1, -Aalpha - 1, -Aalpha, new_depth - reduction);
 
-                    int reduced_depth = std::max(0, new_depth - reduction);
-
-                    score = -search<~C, false>(pos, ss + 1, -Aalpha - 1, -Aalpha, reduced_depth);
-
-                    if (score > Aalpha && reduced_depth < new_depth) 
+                    if (score > Aalpha) 
                         score = -search<~C, false>(pos, ss + 1, -Aalpha - 1, -Aalpha, new_depth);
                 }
                 else {
@@ -569,6 +564,7 @@ namespace Search {
                 (m_ss + i)->move_count  = 0;
                 (m_ss + i)->tt_hit      = false;
                 (m_ss + i)->in_check    = false;
+                (m_ss + i)->null_move   = false;
             }
 
             auto start_current_search = time_ms();

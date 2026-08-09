@@ -11,7 +11,7 @@ constexpr int qsearch_see_threshold = 0;
 
 /* Futility pruning */
 constexpr int fp_depth  = 3;
-constexpr int fp_margin = 500;
+constexpr int fp_margin = 150;
 
 /* Reverse futility pruning */
 constexpr int rfp_base_margin = 65;
@@ -23,13 +23,17 @@ constexpr int razoring_depth = 2;
 
 /* Null move pruning */
 constexpr int nmp_depth          = 2;
-constexpr int nmp_npawn_material = 4;
+constexpr int nmp_npawn_material = 0;
 
 /* Internal Iterative Reductions */
 constexpr int iir_depth = 7;
 
 /* Delta margin */
 constexpr int delta_margin = 100;
+
+/* Late move reductions */
+constexpr int lmr_depth     = 4;
+constexpr int lmr_movecount = 4;
 
 /* Movepicker */
 constexpr int good_quiet_threshold   = -1;

@@ -45,6 +45,7 @@ namespace Search {
         int  move_count;
         bool in_check;
         bool tt_hit;
+        bool null_move;
     };
 
     struct SearchContext {
