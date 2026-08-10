@@ -46,4 +46,18 @@ constexpr int good_capture_threshold = 0;
 constexpr int moves_before_sorting   = 128;
 constexpr int sacrificial_check_threshold = -75;
 
+/* Eval */
+constexpr int attacked_shield_penalty = 16;
+constexpr int pawn_inner_weight       = 8;
+constexpr int pawn_outer_weight       = 4;
+constexpr int multi_attacker_divisor  = 32;
+constexpr int single_attacker_divisor = 4;
+constexpr int max_king_penalty        = 300;
+constexpr int weak_square_weight      = 3;
+constexpr int safe_check_weight       = 0;
+
+constexpr int attacker_weight[NPIECE_TYPES]  = { 0, 8, 8, 12, 20, 0 };
+constexpr int inner_hit_weight[NPIECE_TYPES] = { 0, 4, 4, 6, 8, 0 };
+constexpr int outer_hit_weight[NPIECE_TYPES] = { 0, 1, 1, 2, 3, 0 };
+
 #endif // PARAMETERS_HPP

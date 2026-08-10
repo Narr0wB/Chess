@@ -18,6 +18,58 @@ copies or substantial portions of the Software.
 
 #include <messier/movegen/types.hpp>
 
+#include <array>
+#include <cassert>
+
+inline constexpr int MAX_SQUARE_RADIUS = 3;
+
+using SquareRadiusTable =
+	std::array<std::array<Bitboard, NSQUARES>, MAX_SQUARE_RADIUS + 1>;
+
+// Bitboards containing every square whose king (Chebyshev) distance from the
+// origin is at most radius. Radius zero contains only the origin square.
+consteval SquareRadiusTable make_square_radius_table() {
+	SquareRadiusTable table{};
+
+	for (int origin = 0; origin < static_cast<int>(NSQUARES); ++origin) {
+		const int origin_file = origin & 7;
+		const int origin_rank = origin >> 3;
+
+		for (int target = 0; target < static_cast<int>(NSQUARES); ++target) {
+			const int target_file = target & 7;
+			const int target_rank = target >> 3;
+			const int file_delta = origin_file > target_file
+				? origin_file - target_file
+				: target_file - origin_file;
+			const int rank_delta = origin_rank > target_rank
+				? origin_rank - target_rank
+				: target_rank - origin_rank;
+			const int distance = file_delta > rank_delta ? file_delta : rank_delta;
+
+			for (int radius = distance; radius <= MAX_SQUARE_RADIUS; ++radius)
+				table[radius][origin] |= Bitboard{1} << target;
+		}
+	}
+
+	return table;
+}
+
+inline constexpr SquareRadiusTable SQUARES_WITHIN_RADIUS =
+	make_square_radius_table();
+
+inline constexpr Bitboard squares_within_radius(Square square, int radius) {
+	assert(radius >= 0 && radius <= MAX_SQUARE_RADIUS);
+	return SQUARES_WITHIN_RADIUS[radius][square];
+}
+
+inline constexpr Bitboard squares_at_radius(Square square, int radius) {
+	assert(radius >= 0 && radius <= MAX_SQUARE_RADIUS);
+	return radius == 0
+		? SQUARES_WITHIN_RADIUS[0][square]
+		: SQUARES_WITHIN_RADIUS[radius][square]
+			& ~SQUARES_WITHIN_RADIUS[radius - 1][square];
+}
+
 extern const Bitboard KING_ATTACKS[NSQUARES];
 extern const Bitboard KNIGHT_ATTACKS[NSQUARES];
 extern const Bitboard WHITE_PAWN_ATTACKS[NSQUARES];

@@ -193,14 +193,15 @@ namespace Search {
             move_count++;
 
             if (!ss->in_check && !m.is_promotion()) {
+                const bool gives_check = pos.gives_check<C>(m);
                 if (!m.is_capture()) 
                     continue;
 
                 if ((ss->static_eval + piece_value[m.is_enpassant() ? PAWN : type_of(pos.at(m.to()))] + delta_margin <= Aalpha)
-                    && !pos.gives_check<C>(m))
+                    && !gives_check)
                     continue;
 
-                if (!pos.see<C>(m, qsearch_see_threshold))
+                if (!gives_check && !pos.see<C>(m, qsearch_see_threshold))
                     continue;
             }
 
@@ -441,7 +442,7 @@ namespace Search {
                 && !ss->in_check
                 && !m.is_promotion()
                 && searched_count > 0
-                && !pos.see<C>(m, see_pruning_threshold - 100 * gives_check);
+                && !pos.see<C>(m, see_pruning_threshold - 250 * gives_check);
 
             if (see_prunable)
                 continue;
