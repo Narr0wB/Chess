@@ -60,4 +60,11 @@ constexpr int attacker_weight[NPIECE_TYPES]  = { 0, 8, 8, 12, 20, 0 };
 constexpr int inner_hit_weight[NPIECE_TYPES] = { 0, 4, 4, 6, 8, 0 };
 constexpr int outer_hit_weight[NPIECE_TYPES] = { 0, 1, 1, 2, 3, 0 };
 
+constexpr int shelter_penalty[9] = { 0, 0, 5, 10, 16, 20, 22, 24, 24 };
+constexpr int storm_penalty[9] = { 0, 28, 18, 10, 5, 2, 0, 0, 0 };
+constexpr int blocked_storm_penalty[9] = { 0, 8, 6, 3, 1, 0, 0, 0, 0 };
+
+constexpr int semi_open_penalty = 8;
+constexpr int fully_open_penalty = 18;
+
 #endif // PARAMETERS_HPP

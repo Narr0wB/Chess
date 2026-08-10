@@ -46,15 +46,68 @@ template <Color Defender>
 inline void evaluate_shelter(KingSafety& safety, const EvalInfo& info, const Position& pos)
 {
     constexpr Color Attacker = ~Defender;
+    constexpr int NO_PAWN = 8;
 
     Bitboard our_pawns = pos.bitboard_of(make_piece(Defender, PAWN));
+    Bitboard their_pawns = pos.bitboard_of(make_piece(Attacker, PAWN));
+    
+    const Square king = bsf(pos.bitboard_of(make_piece(Defender, KING)));
+    const int king_rank = int(rank_of(king));
+    const int king_file = int(file_of(king));
+    const int center = std::clamp(king_file, int(BFILE), int(GFILE));
+
+    auto nearest_dist = [&](Bitboard pawns, int file) {
+        int nearest = NO_PAWN;
+        pawns &= MASK_FILE[file];
+
+        while (pawns) {
+            const int rank = int(rank_of(pop_lsb(&pawns)));
+            int distance = Defender == WHITE ? rank - king_rank : king_rank - rank;
+            if (distance > 0)
+                nearest = std::min(nearest, distance);
+        }
+
+        return nearest;
+    };
+
+    for (int file = center - 1; file <= center + 1; ++file) {
+        const int our_distance = nearest_dist(our_pawns, file);
+        const int their_distance = nearest_dist(their_pawns, file);
+
+        const int file_distance = file > king_file ? file - king_file : king_file - file;
+        const int file_scale = 
+            file_distance == 0 ? 100 : 
+            file_distance == 1 ? 80 : 50;
+
+        safety.shelter += shelter_penalty[our_distance] * file_scale / 100;
+
+        if (their_distance != NO_PAWN) {
+            const bool blocked =
+                our_distance != NO_PAWN
+                && their_distance == our_distance + 1;
+
+            const int penalty = blocked
+                ? blocked_storm_penalty[their_distance]
+                : storm_penalty[their_distance];
+
+            safety.storm += penalty * file_scale / 100;
+        }
+        else {
+            safety.open_files +=
+                (our_distance == NO_PAWN
+                    ? fully_open_penalty
+                    : semi_open_penalty)
+                * file_scale / 100;
+        }
+
+    }
 
     Bitboard attacked_shield = 
         our_pawns
         & (info.king_inner[Defender] | info.king_outer[Defender])
         & info.attacks_by[Attacker][PAWN];
     
-    safety.shelter += attacked_shield_penalty * pop_count(attacked_shield);
+    safety.storm += attacked_shield_penalty * pop_count(attacked_shield);
 }
 
 template <Color Defender>
