@@ -11,7 +11,7 @@ constexpr int16_t MAX_HISTORY = ((int16_t)(1 << 13));
 
 /* Search */
 constexpr int time_check_nodes      = 2048;
-constexpr int qsearch_see_threshold = 0;
+constexpr int qsearch_see_threshold = -75;
 
 /* Futility pruning */
 constexpr int fp_depth     = 3;

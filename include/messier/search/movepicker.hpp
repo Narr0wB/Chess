@@ -80,6 +80,8 @@ public:
         }
     };
 
+    inline Stage stage() const { return m_stage; }
+
     /* 
         More or less, in normal tree-search the state of the MovePicker behaves as follows:
             TT move,

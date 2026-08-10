@@ -1148,8 +1148,7 @@ bool Position::see(Move m, int threshold) {
 	PieceType capturing = m.is_promotion() ? m.promotion() : type_of(at(from));
 	int value = 0; 
 
-	// For moves like promotions, and en passant, we automatically assume that they are worth searching (value >= 0)
-	if (!m.is_capture() || m.is_enpassant())
+	if (m.is_enpassant())
 		return 0 >= threshold;
 
     int promotion_gain = m.is_promotion() ? piece_value[m.promotion()] - piece_value[PAWN] : 0;

@@ -168,6 +168,10 @@ int phase_weight[NPIECE_TYPES] = {
 int mg_mobility[NPIECE_TYPES] = { 0, 4, 5, 2, 1, 0 };
 int eg_mobility[NPIECE_TYPES] = { 0, 3, 5, 5, 2, 0 };
 
+int attacker_weight[NPIECE_TYPES] = {0, 6, 6, 10, 16, 0};
+int ring_hit_weight[NPIECE_TYPES] = {2, 3, 3,  5,  6, 0};
+int danger_scale[NPIECE_TYPES]    = {0, 50, 100, 120, 135, 145};
+
 int evaluate(const Position& position) 
 {
     int mg_score = 0;
@@ -177,6 +181,15 @@ int evaluate(const Position& position)
     Bitboard white_occ = position.all_pieces<WHITE>();
     Bitboard black_occ = position.all_pieces<BLACK>();
     Bitboard occ = white_occ | black_occ;
+
+    Bitboard white_king_ring = attacks<KING>(bsf(position.bitboard_of(WHITE_KING)), occ);
+    Bitboard black_king_ring = attacks<KING>(bsf(position.bitboard_of(BLACK_KING)), occ);
+
+    int white_attk_cnt = 0;
+    int black_attk_cnt = 0;
+
+    int white_danger = 0;
+    int black_danger = 0;
 
     for (PieceType p = PAWN; p <= KING; ++p) {
         Bitboard white_piece_bb = position.bitboard_of(make_piece(WHITE, p));
@@ -189,11 +202,19 @@ int evaluate(const Position& position)
             eg_score += eg_value[p];
             mg_score += mg_tables[p][piece_sq ^ 56];
             eg_score += eg_tables[p][piece_sq ^ 56];
+            
+            Bitboard attk = (p == PAWN ? pawn_attacks<WHITE>(piece_sq) : attacks(p, piece_sq, occ)) & ~white_occ;
 
             if (p != PAWN && p != KING) {
-                int mob = pop_count(attacks(p, piece_sq, occ) & ~white_occ);
+                int mob = pop_count(attk);
                 mg_score += mg_mobility[p] * mob;
                 eg_score += eg_mobility[p] * mob;
+            }
+
+            if (p != KING && attk & black_king_ring) {
+                black_attk_cnt++;
+                black_danger += attacker_weight[p];
+                black_danger += pop_count(attk & black_king_ring) * ring_hit_weight[p];
             }
 
             phase += phase_weight[p];
@@ -207,15 +228,29 @@ int evaluate(const Position& position)
             mg_score -= mg_tables[p][piece_sq];
             eg_score -= eg_tables[p][piece_sq];
 
+            Bitboard attk = (p == PAWN ? pawn_attacks<BLACK>(piece_sq) : attacks(p, piece_sq, occ)) & ~black_occ;
+
             if (p != PAWN && p != KING) {
-                int mob = pop_count(attacks(p, piece_sq, occ) & ~black_occ);
+                int mob = pop_count(attk);
                 mg_score -= mg_mobility[p] * mob;
                 eg_score -= eg_mobility[p] * mob;
+            }
+
+            if (p != KING && attk & white_king_ring) {
+                white_attk_cnt++;
+                white_danger += attacker_weight[p];
+                white_danger += pop_count(attk & white_king_ring) * ring_hit_weight[p];
             }
 
             phase += phase_weight[p];
         }
     }
+
+    white_danger = (white_danger * danger_scale[std::min(white_attk_cnt, 5)]) / 100;
+    black_danger = (black_danger * danger_scale[std::min(black_attk_cnt, 5)]) / 100;
+
+    mg_score += black_danger - white_danger;
+    eg_score += (black_danger - white_danger) / 4;
 
     phase = std::min(phase, 24);
     return (phase * mg_score + (24 - phase) * eg_score) / 24;
