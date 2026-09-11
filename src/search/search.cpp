@@ -65,6 +65,7 @@ namespace Search {
 
     void Worker::stop() {
         m_stop = true;
+        m_stop.notify_one();
     }
 
     void Worker::kill() {
@@ -79,6 +80,7 @@ namespace Search {
     }
 
     void Worker::bench(const SearchConfig& cfg) {
+        m_stop = false;
         m_cfg = cfg;
 
         uint64_t total_nodes = 0;
@@ -650,8 +652,12 @@ namespace Search {
             if (!silent) {
                 std::cout 
                     << "info depth " << current_depth 
-                    << " score cp " << score
-                    << " nodes " << m_info.nodes 
+                    << " score ";
+                if (std::abs(score) >= MATE_SCORE - MAX_PLY)
+                    std::cout << "mate " << (score > 0 ? (MATE_SCORE - score + 1) / 2 : -(MATE_SCORE + score) / 2);
+                else
+                    std::cout << "cp " << score;
+                std::cout << " nodes " << m_info.nodes
                     << " qnodes " << m_info.qnodes 
                     << " nps " << nps 
                     << " tthits " << m_info.tt_hits 
@@ -668,6 +674,9 @@ namespace Search {
 
             best_move = m_ss->bestmove;
         }
+
+        if (m_cfg.infinite)
+            m_stop.wait(false);
 
         auto end_time = time_ms();
 

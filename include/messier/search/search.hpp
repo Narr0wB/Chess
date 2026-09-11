@@ -27,6 +27,7 @@ namespace Search {
         bool timeset;
         bool movetimeset;
         bool nodeset;
+        bool infinite;
     };
 
     struct SearchInfo {

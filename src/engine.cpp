@@ -1,4 +1,8 @@
 
+#include <charconv>
+#include <sstream>
+#include <span>
+
 #include <messier/engine.hpp>
 #include <messier/log.hpp>
 #include <messier/misc.hpp>
@@ -93,32 +97,47 @@ namespace Engine {
 
 	}
 
-	void Engine::UCI_parse_command(const std::string& command) 
+	void Engine::UCI_parse_command(const std::string& input)
 	{
-		std::vector<std::string> tokens = tokenize(command, ' ');
+		std::istringstream stream(input);
+		std::vector<std::string> tokens;
+		std::string token;
+		while (stream >> token)
+			tokens.push_back(token);
+		if (tokens.empty()) return;
+
+		auto valid_number = [&](size_t index) {
+			if (index >= tokens.size()) return false;
+			int value;
+			const std::string& text = tokens[index];
+			auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+			return error == std::errc() && end == text.data() + text.size() && value >= 0;
+		};
+
+        auto find = [&](const std::string& needle) {
+            for (ssize_t i = 0; i < tokens.size(); ++i) {
+                if (tokens[i] == needle) return i;
+            }
+            return (ssize_t)-1;
+        };
 
 		if (tokens[0] == "position") {
+			if (tokens.size() < 2) return;
+			if (tokens[1] != "startpos" && tokens[1] != "fen") return;
+			if (tokens[1] == "fen" && (tokens.size() < 8 || !valid_number(6) || !valid_number(7))) return;
 			m_board.reset();
 
 			if (tokens[1] == "startpos") 
 				Position::set(START_POSITION, m_board);
 
 			else if (tokens[1] == "fen") 
-				Position::set(command.substr(command.find("fen") + 4, std::string::npos), m_board);
+				Position::set(input.substr(input.find("fen") + 4, std::string::npos), m_board);
 
-			if (command.find("moves") != std::string::npos) {
-				int string_start = command.find("moves") + 6;
-
-				if (string_start > command.length()) return;
-
-                std::string moves_substr = command.substr(string_start, std::string::npos);
-                std::vector<std::string> moves = tokenize(moves_substr, ' ');
-
+            ssize_t m = find("moves");
+			if (m != -1) {
+                std::span<std::string> moves(tokens.begin() + m + 1, tokens.end());
 				for (const std::string& move : moves) {
-					if (move == "O-O" || move == "O-O-O") continue;
-
 					Move m = Move::from_string(move);
-
 					auto match_lambda = [&m](Move _m) {
 						if (m.is_promotion()) {
 							// If the move is a promotion, Move::from_string() only loaded the promotion type (since captures are inferred by the current position).
@@ -173,6 +192,7 @@ namespace Engine {
 			}
 
 			if (tokens.at(2) == "Hash") {
+				if (!valid_number(4) || std::stoi(tokens[4]) < 1 || std::stoi(tokens[4]) > 2048) return;
 				size_t table_size = std::stoi(tokens.at(4));
 
 				m_options.hash_table_size_mb = table_size;
@@ -181,13 +201,14 @@ namespace Engine {
 			}
 			
 			else if (tokens.at(2) == "Threads") {
+				if (!valid_number(4) || std::stoi(tokens[4]) != 1) return;
 				m_options.threads = std::stoi(tokens.at(4));
 
 				// TODO
 			}
         
 			else {
-				std::cout << "Unknown command: " << command << std::endl;
+				std::cout << "Unknown command: " << input << std::endl;
 			}
 		}
 
@@ -206,6 +227,7 @@ namespace Engine {
 		}
 
 		else if (tokens[0] == "bench") {
+			if (tokens.size() > 1 && !valid_number(tokens[1] == "nodes" ? 2 : 1)) return;
 			Search::SearchConfig cfg = {0};
 			cfg.max_depth = MAX_DEPTH;
 
@@ -221,19 +243,30 @@ namespace Engine {
 		}
 
 		else if (tokens[0] == "go") {
-			// Interrupt any previous search
+			for (size_t i = 1; i < tokens.size(); ++i) {
+				if (tokens[i] == "wtime" || tokens[i] == "btime" || tokens[i] == "winc" || tokens[i] == "binc"
+					|| tokens[i] == "movestogo" || tokens[i] == "movetime" || tokens[i] == "depth" || tokens[i] == "nodes") {
+					if (!valid_number(++i)) return;
+				}
+				else if (tokens[i] == "searchmoves") {
+					if (++i >= tokens.size() || Move::from_string(tokens[i]) == Move::none()) return;
+				}
+			}
+
 			m_worker.stop();
 
-			// Check if current position is set
-			if (!m_board) {
+			if (!m_board)
 				Position::set(START_POSITION, m_board);
-			}
 
 			int depth = -1, time = 0, inc = 0;
 			Search::SearchConfig cfg = {0};
 
 			for (size_t i = 0; i < tokens.size(); ++i) {
-				if (tokens.at(i) == "binc" and m_board.turn() == BLACK) {
+				if (tokens.at(i) == "infinite") {
+					cfg.infinite = true;
+				}
+
+				else if (tokens.at(i) == "binc" and m_board.turn() == BLACK) {
 					inc = std::stoi(tokens.at(i + 1));
 				}
 
@@ -286,7 +319,7 @@ namespace Engine {
 			// Optimize time available for this search
 			optimize(cfg, time, inc);
 
-            LOG_INFO("command: {}", command); 
+            LOG_INFO("command: {}", input); 
             LOG_INFO("time: {}", time); 
             LOG_INFO("start: {}", cfg.search_start_time); 
             LOG_INFO("stop: {}", cfg.search_end_time); 
@@ -300,8 +333,9 @@ namespace Engine {
 
 		/* Debug command */
 		else if (tokens[0] == "probe") {
+			if (tokens.size() < 7 || !valid_number(5) || !valid_number(6)) return;
 			Position p;	
-			Position::set(command.substr(command.find(' ') + 1), p);
+			Position::set(input.substr(input.find(' ') + 1), p);
 
 			auto [hit, entry] = m_table.probe(p.get_hash());
 
@@ -346,8 +380,9 @@ namespace Engine {
 		}
 
 		else if (tokens[0] == "eval") {
+			if (tokens.size() < 7 || !valid_number(5) || !valid_number(6)) return;
 			Position p;	
-			Position::set(command.substr(command.find(' ') + 1), p);
+			Position::set(input.substr(input.find(' ') + 1), p);
 
 			std::cout << "cp: " << evaluate(p) * (p.turn() == WHITE ? 1 : -1);
 		}

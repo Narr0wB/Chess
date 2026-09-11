@@ -102,22 +102,29 @@ const char* MOVE_TYPESTR[16] = {
 };
 
 const char* MOVE_TYPESTR_B[16] = {
-	"", "", "", "", "n", "b", "r", "q", "", "", " e.p.", "",
+	"", "", "", "", "n", "b", "r", "q", "", "", "", "",
 	"n", "b", "r", "q"
 };
 
 //Prints the move
 //For example: e5d6 (capture); a7a8R; O-O
 std::ostream& operator<<(std::ostream& os, const Move& m) {
+	if (m == Move::none()) return os << "0000";
 	os << SQSTR[m.from()] << SQSTR[m.to()] << MOVE_TYPESTR_B[m.flags()];
 	return os;
 }
 
 std::string Move::to_string() { 
+	if (*this == Move::none()) return "0000";
 	return std::string(SQSTR[from()]) + std::string(SQSTR[to()]) + std::string(MOVE_TYPESTR_B[flags()]); 
 }
 
 Move Move::from_string(const std::string& string) {
+	if (string.length() != 4 && string.length() != 5) return Move::none();
+	if (string[0] < 'a' || string[0] > 'h' || string[2] < 'a' || string[2] > 'h'
+		|| string[1] < '1' || string[1] > '8' || string[3] < '1' || string[3] > '8')
+		return Move::none();
+
 	if (string.length() == 4) {
 		return Move(create_square(File(string[0] - 'a'), Rank(string[1] - '1')), create_square(File(string[2] - 'a'), Rank(string[3] - '1')));	
 	}

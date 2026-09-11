@@ -114,7 +114,7 @@ inline std::tuple<bool, const Transposition*> TTable::probe(uint64_t hash) const
     const Cluster& c = m_map[mul_hi64(hash, m_map.size())];
 
     for (int i = 0; i < CLUSTER_SIZE; ++i)
-        if (c[i].hash == (hash & HASH_MASK))
+        if (c[i].flags != FLAG_EMPTY && c[i].hash == (hash & HASH_MASK))
             return {true, &c[i]};
 
     return {false, nullptr};
